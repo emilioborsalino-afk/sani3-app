@@ -129,19 +129,20 @@ function cargarJSONP(url){
 
 async function cargar(){
   const params = new URLSearchParams(location.search);
-  const nombre = (params.get('nombre') || '').trim();
+  const nombreParam = (params.get('nombre') || '').trim();
+  const nombrePrincipal = nombreParam.split('|')[0].trim();
   const main = document.getElementById('main');
 
-  if(!nombre){
+  if(!nombreParam){
     document.getElementById('clienteNombre').textContent = 'Falta el nombre';
     main.innerHTML = '<div class="error">Este link no incluye tu nombre. Pedile a Sani3 que te reenvíe el link correcto.</div>';
     return;
   }
 
-  document.getElementById('clienteNombre').textContent = nombre;
+  document.getElementById('clienteNombre').textContent = nombrePrincipal;
 
   try{
-    const records = await cargarJSONP(BACKEND_URL + '?action=recordsFor&cliente=' + encodeURIComponent(nombre));
+    const records = await cargarJSONP(BACKEND_URL + '?action=recordsFor&cliente=' + encodeURIComponent(nombreParam));
     if(records && records.error) throw new Error(records.error);
 
     if(!records || records.length === 0){

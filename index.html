@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Registro de Servicios</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#114B4B">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sani3">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+  :root{
+    --bg: #F3F6F5;
+    --ink: #15211E;
+    --teal: #114B4B;
+    --teal-deep: #0B3535;
+    --green: #2E7D5B;
+    --amber: #C97A22;
+    --card: #FFFFFF;
+    --line: #D8E0DE;
+    --mono: 'IBM Plex Mono', monospace;
+    --disp: 'Barlow Semi Condensed', sans-serif;
+    --body: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--body);
+    -webkit-tap-highlight-color:transparent;
+    min-height:100vh;
+    padding-bottom:40px;
+  }
+  .topbar{
+    background:var(--teal);
+    color:#EFF7F5;
+    padding:18px 20px 22px;
+    position:sticky;
+    top:0;
+    z-index:10;
+    box-shadow:0 2px 10px rgba(0,0,0,0.12);
+  }
+  .topbar input{
+    background:transparent;
+    border:none;
+    color:#EFF7F5;
+    font-family:var(--disp);
+    font-weight:800;
+    font-size:22px;
+    letter-spacing:0.3px;
+    width:100%;
+    padding:0;
+  }
+  .topbar input::placeholder{color:#9FC2BC;}
+  .topbar .sub{
+    font-family:var(--mono);
+    font-size:12px;
+    color:#9FC2BC;
+    margin-top:4px;
+    letter-spacing:0.5px;
+  }
+  .conn-dot{
+    display:inline-block; width:8px; height:8px; border-radius:50%;
+    background:#C97A22; margin-right:6px;
+  }
+  .conn-dot.ok{background:#5FBE8B;}
+  main{
+    max-width:520px;
+    margin:0 auto;
+    padding:18px 16px 0;
+  }
+  .section-label{
+    font-family:var(--disp);
+    font-weight:700;
+    font-size:13px;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    color:var(--teal);
+    margin:22px 0 10px 2px;
+  }
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px;
+  }
+  select, .client-input{
+    width:100%;
+    padding:12px 12px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    font-family:var(--body);
+    font-size:16px;
+    background:#fff;
+    color:var(--ink);
+  }
+  .row{display:flex; gap:8px; margin-top:10px;}
+  .row .client-input{flex:1;}
+  button{
+    font-family:var(--disp);
+    font-weight:700;
+    letter-spacing:0.2px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+  }
+  .btn-small{
+    background:var(--teal);
+    color:#fff;
+    padding:0 16px;
+    font-size:15px;
+  }
+  .btn-small:active{background:var(--teal-deep);}
+  .btn-main{
+    width:100%;
+    background:var(--green);
+    color:#fff;
+    font-size:19px;
+    padding:18px 10px;
+    margin-top:14px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    cursor:pointer;
+    user-select:none;
+    border-radius:8px;
+  }
+  .btn-main.disabled-look{background:#B9C4C0; cursor:not-allowed;}
+  .btn-main:active{background:#245F46;}
+  .status-line{
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:#5A6A66;
+    margin-top:10px;
+    min-height:16px;
+    white-space:pre-wrap;
+  }
+  .status-line.ok{color:var(--green);}
+  .status-line.err{color:#B4432B;}
+
+  .client-chip{
+    display:flex; align-items:center; justify-content:space-between;
+    background:#fff; border:1px solid var(--line); border-radius:8px;
+    padding:9px 12px; margin-top:8px; font-size:14.5px;
+  }
+  .client-chip button{
+    background:none; color:#B4432B; font-family:var(--body); font-weight:600;
+    font-size:13px; padding:2px;
+  }
+
+  .ticket{
+    position:relative;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    margin-top:12px;
+    padding:14px 14px 12px;
+    animation: stamp 0.35s ease-out;
+  }
+  @keyframes stamp{
+    from{ transform:scale(0.96); opacity:0; }
+    to{ transform:scale(1); opacity:1; }
+  }
+  .ticket::before{
+    content:"";
+    position:absolute;
+    left:14px; right:14px; bottom:-1px;
+    border-top:1.5px dashed var(--line);
+  }
+  .ticket-top{
+    display:flex; justify-content:space-between; align-items:flex-start; gap:10px;
+  }
+  .ticket-client{
+    font-family:var(--disp); font-weight:700; font-size:17px; color:var(--teal-deep);
+  }
+  .ticket-code{
+    font-family:var(--mono); font-size:11px; color:#8A9793; text-align:right; white-space:nowrap;
+  }
+  .ticket-time{
+    font-family:var(--mono); font-size:13px; color:#3C4A46; margin-top:4px;
+  }
+  .ticket-body{
+    display:flex; gap:10px; margin-top:10px;
+  }
+  .ticket-photo{
+    width:78px; height:78px; border-radius:6px; object-fit:cover;
+    border:1px solid var(--line); flex-shrink:0; cursor:pointer;
+  }
+  .ticket-info{font-size:13px; color:#4A5854; line-height:1.5; flex:1;}
+  .ticket-info a{color:var(--teal); text-decoration:none; font-weight:600;}
+  .ticket-actions{
+    display:flex; gap:8px; margin-top:12px;
+  }
+  .ticket-actions button{
+    flex:1; padding:10px 6px; font-size:13.5px;
+  }
+  .btn-wa{background:#1F8A5C; color:#fff;}
+  .btn-wa:active{background:#166B47;}
+  .btn-del{background:#fff; color:#B4432B; border:1px solid #EBC9C0;}
+
+  .empty{
+    text-align:center; color:#8A9793; font-size:14px; padding:30px 10px;
+    font-family:var(--mono);
+  }
+
+  .lightbox{
+    position:fixed; inset:0; background:rgba(10,20,18,0.9);
+    display:none; align-items:center; justify-content:center; z-index:50; padding:20px;
+  }
+  .lightbox.open{display:flex;}
+  .lightbox img{max-width:100%; max-height:100%; border-radius:8px;}
+
+  footer.note{
+    max-width:520px; margin:26px auto 0; padding:0 16px 10px;
+    font-size:12px; color:#8A9793; line-height:1.5;
+  }
+
+  #fatalErrorBanner{
+    position:fixed; top:0; left:0; right:0; background:#B4432B; color:#fff;
+    padding:10px 14px; font-family:monospace; font-size:12px; z-index:9999;
+    white-space:pre-wrap; display:none;
+  }
+</style>
+</head>
+<body>
+
+<div id="fatalErrorBanner"></div>
+
+<div class="topbar">
+  <input id="companyName" placeholder="Nombre de la empresa" />
+  <div class="sub" id="todayLabel"></div>
+  <div class="sub" style="margin-top:8px;"><span class="conn-dot" id="connDot"></span><span id="connLabel">Sin conectar al backend</span></div>
+</div>
+
+<main>
+
+  <div class="section-label">Conexión (una sola vez por celular)</div>
+  <div class="card">
+    <input class="client-input" id="backendUrlInput" placeholder="Pegá acá la URL del Apps Script (Web App)">
+    <button class="btn-small" id="saveBackendUrlBtn" style="width:100%; margin-top:10px; padding:12px;">Conectar</button>
+    <div class="status-line" id="connStatus"></div>
+  </div>
+
+  <div class="section-label">Cliente</div>
+  <div class="card">
+    <div id="selectedClientLabel" style="font-family:var(--disp); font-weight:700; font-size:15px; color:#8A9793; margin-bottom:10px;">Ningún cliente elegido todavía</div>
+    <div id="clientAccordion"></div>
+    <div class="row" style="margin-top:14px;">
+      <input class="client-input" id="newClientInput" placeholder="Nombre (solo si no está en la lista)">
+    </div>
+    <div class="row">
+      <input class="client-input" id="newClientAddrInput" placeholder="Dirección / ubicación">
+      <button class="btn-small" id="addClientBtn">Agregar</button>
+    </div>
+    <button id="toggleClientListBtn" style="width:100%; margin-top:10px; background:none; color:var(--teal); font-family:var(--body); font-weight:600; font-size:13px; padding:8px;">Ver lista completa de clientes</button>
+    <div id="clientList" style="display:none;"></div>
+  </div>
+
+  <div class="section-label">Registrar visita — foto del frente de la obra</div>
+  <div class="card">
+    <input type="file" accept="image/*" capture="environment" id="photoInput" style="position:absolute; width:1px; height:1px; opacity:0; overflow:hidden;">
+    <label class="btn-main" id="registerBtn" for="photoInput">📷 Foto del frente de la obra y registrar</label>
+    <div class="status-line" id="statusLine"></div>
+  </div>
+
+  <div class="section-label">Historial</div>
+  <div class="card" style="padding:12px;">
+    <button class="btn-small" id="exportBtn" style="width:100%; padding:12px;">⬇ Exportar historial a Excel</button>
+    <button class="btn-small" id="refreshBtn" style="width:100%; padding:12px; margin-top:8px; background:var(--teal-deep);">↻ Actualizar historial</button>
+  </div>
+  <div id="historyList"></div>
+
+</main>
+
+<footer class="note">
+  Los datos se guardan en tu Google Sheet: cualquiera que abra esta app apuntando al mismo backend ve el mismo historial y los mismos clientes.
+  Cada foto queda con una franja quemada abajo con cliente, fecha, hora y coordenadas (no se puede editar después) y se sube a una carpeta de Google Drive llamada "Fotos Registro Servicios".
+  El botón de WhatsApp intenta compartir foto + texto directo (en celular); si el navegador no lo permite, abre WhatsApp con el texto y hay que adjuntar la foto a mano.
+</footer>
+
+<div class="lightbox" id="lightbox" onclick="this.classList.remove('open')">
+  <img id="lightboxImg" src="">
+</div>
+
+<script>
+const BACKEND_URL_KEY = 'sani3_backend_url';
+
+let backendUrl = '';
+let clients = [];
+let records = [];
+let config = { companyName: 'Sani3' };
+let pendingPositionPromise = null;
+
+const CLIENTES_PRECARGADOS = []; // ya no se usa: los clientes se leen en vivo desde Registro Alquileres
+
+function todayLabel(){
+  const d = new Date();
+  document.getElementById('todayLabel').textContent = d.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+}
+
+function setStatus(msg, type){
+  const el = document.getElementById('statusLine');
+  el.textContent = msg;
+  el.className = 'status-line' + (type ? ' ' + type : '');
+}
+function setConnStatus(msg, type){
+  const el = document.getElementById('connStatus');
+  el.textContent = msg;
+  el.className = 'status-line' + (type ? ' ' + type : '');
+}
+function setConnDot(ok){
+  document.getElementById('connDot').className = 'conn-dot' + (ok ? ' ok' : '');
+  document.getElementById('connLabel').textContent = ok ? 'Conectado al backend' : 'Sin conectar al backend';
+}
+
+function showFatalError(msg){
+  const banner = document.getElementById('fatalErrorBanner');
+  banner.textContent = 'Error: ' + msg;
+  banner.style.display = 'block';
+}
+window.addEventListener('error', (e)=>{ showFatalError(e.message); });
+window.addEventListener('unhandledrejection', (e)=>{
+  showFatalError(e.reason && e.reason.message ? e.reason.message : String(e.reason));
+});
+
+// ---------- Llamadas al backend (Google Apps Script) ----------
+
+async function backendGet(action){
+  if(!backendUrl) throw new Error('Todavía no conectaste el backend (pegá la URL arriba).');
+  const res = await fetch(backendUrl + '?action=' + encodeURIComponent(action));
+  const data = await res.json();
+  if(data && data.error) throw new Error(data.error);
+  return data;
+}
+async function backendPost(payload){
+  if(!backendUrl) throw new Error('Todavía no conectaste el backend (pegá la URL arriba).');
+  const res = await fetch(backendUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if(data && data.error) throw new Error(data.error);
+  return data;
+}
+
+async function loadAll(){
+  document.getElementById('companyName').value = config.companyName || '';
+  if(!backendUrl){
+    setConnDot(false);
+    renderClientSelect();
+    renderClientList();
+    renderHistory();
+    return;
+  }
+  try{
+    config = await backendGet('config');
+    document.getElementById('companyName').value = config.companyName || '';
+
+    clients = await backendGet('clients');
+    records = await backendGet('records');
+
+    setConnDot(true);
+    setConnStatus('Conectado. ' + clients.length + ' clientes, ' + records.length + ' servicios en el historial.', 'ok');
+  }catch(err){
+    setConnDot(false);
+    setConnStatus('Error al conectar: ' + err.message, 'err');
+  }
+  renderClientSelect();
+  renderClientList();
+  renderHistory();
+}
+
+document.getElementById('companyName').addEventListener('change', async (e)=>{
+  config.companyName = e.target.value;
+  try{ await backendPost({ action:'setConfig', companyName: config.companyName }); }
+  catch(err){ setStatus('No se pudo guardar el nombre: ' + err.message, 'err'); }
+});
+
+document.getElementById('saveBackendUrlBtn').onclick = async ()=>{
+  const val = document.getElementById('backendUrlInput').value.trim();
+  if(!val){ setConnStatus('Pegá la URL primero.', 'err'); return; }
+  backendUrl = val;
+  localStorage.setItem(BACKEND_URL_KEY, backendUrl);
+  setConnStatus('Conectando...');
+  await loadAll();
+};
+
+document.getElementById('refreshBtn').onclick = async ()=>{
+  setStatus('Actualizando...');
+  await loadAll();
+  setStatus('Historial actualizado.', 'ok');
+};
+
+// ---------- Clientes ----------
+
+const DIAS_CANON = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
+function normalizar(s){
+  return (s||'').toLowerCase()
+    .replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u');
+}
+function diasDeCliente(c){
+  const dia = normalizar(c.dia);
+  const encontrados = DIAS_CANON.filter(d => dia.indexOf(normalizar(d)) !== -1);
+  return encontrados.length ? encontrados : ['Otros'];
+}
+
+let selectedClientIndex = null;
+
+function updateSelectedLabel(){
+  const label = document.getElementById('selectedClientLabel');
+  const c = (selectedClientIndex != null) ? clients[selectedClientIndex] : null;
+  if(!c){
+    label.textContent = 'Ningún cliente elegido todavía';
+    label.style.color = '#8A9793';
+  } else {
+    label.textContent = 'Elegido: ' + c.nombre + (c.direccion ? ' — ' + c.direccion : '');
+    label.style.color = 'var(--teal-deep)';
+  }
+}
+
+function renderClientSelect(){
+  const wrap = document.getElementById('clientAccordion');
+  wrap.innerHTML = '';
+  const registerBtn = document.getElementById('registerBtn');
+
+  if(clients.length === 0){
+    wrap.innerHTML = '<div class="empty" style="padding:16px 0;">Agregá un cliente abajo primero.</div>';
+    registerBtn.dataset.disabled = 'true';
+    registerBtn.classList.add('disabled-look');
+    selectedClientIndex = null;
+    updateSelectedLabel();
+    return;
+  }
+
+  // si el cliente elegido ya no existe (se quitó, o se recargó la lista), lo soltamos
+  if(selectedClientIndex != null && !clients[selectedClientIndex]) selectedClientIndex = null;
+
+  const grupos = {};
+  DIAS_CANON.concat(['Otros']).forEach(d => grupos[d] = []);
+  clients.forEach((c, i)=>{
+    diasDeCliente(c).forEach(d => grupos[d].push(i));
+  });
+
+  DIAS_CANON.concat(['Otros']).forEach(d=>{
+    if(grupos[d].length === 0) return;
+
+    const section = document.createElement('div');
+    section.style.cssText = 'border:1px solid var(--line); border-radius:8px; margin-top:8px; overflow:hidden;';
+
+    const header = document.createElement('button');
+    header.type = 'button';
+    header.style.cssText = 'width:100%; text-align:left; background:var(--teal); color:#fff; padding:12px 14px; font-family:var(--disp); font-weight:700; font-size:15px; border:none; display:flex; justify-content:space-between; align-items:center; cursor:pointer;';
+    const label = document.createElement('span');
+    label.textContent = (d === 'Otros' ? 'Otros / agregados a mano' : d) + ` (${grupos[d].length})`;
+    const arrow = document.createElement('span');
+    arrow.textContent = '▾';
+    arrow.className = 'acc-arrow';
+    header.appendChild(label);
+    header.appendChild(arrow);
+
+    const body = document.createElement('div');
+    body.className = 'acc-body';
+    body.style.cssText = 'display:none; background:#fff;';
+
+    grupos[d].forEach(i=>{
+      const c = clients[i];
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.dataset.idx = i;
+      item.style.cssText = 'width:100%; text-align:left; padding:12px 14px; border:none; border-top:1px solid var(--line); background:' + (selectedClientIndex===i ? '#E3ECEA' : '#fff') + '; font-family:var(--body); font-size:14.5px; color:var(--ink); cursor:pointer;';
+      item.innerHTML = c.direccion
+        ? `<strong>${escapeHtml(c.nombre)}</strong><br><span style="color:#8A9793; font-size:12.5px;">${escapeHtml(c.direccion)}</span>`
+        : `<strong>${escapeHtml(c.nombre)}</strong>`;
+      item.onclick = ()=>{
+        selectedClientIndex = i;
+        updateSelectedLabel();
+        wrap.querySelectorAll('[data-idx]').forEach(el=> el.style.background = '#fff');
+        item.style.background = '#E3ECEA';
+        registerBtn.dataset.disabled = 'false';
+        registerBtn.classList.remove('disabled-look');
+        // colapsamos todo despues de elegir, para que quede prolijo
+        wrap.querySelectorAll('.acc-body').forEach(b=>b.style.display='none');
+        wrap.querySelectorAll('.acc-arrow').forEach(a=>a.textContent='▾');
+      };
+      body.appendChild(item);
+    });
+
+    header.onclick = ()=>{
+      const isOpen = body.style.display === 'block';
+      wrap.querySelectorAll('.acc-body').forEach(b=>b.style.display='none');
+      wrap.querySelectorAll('.acc-arrow').forEach(a=>a.textContent='▾');
+      body.style.display = isOpen ? 'none' : 'block';
+      arrow.textContent = isOpen ? '▾' : '▴';
+    };
+
+    section.appendChild(header);
+    section.appendChild(body);
+    wrap.appendChild(section);
+  });
+
+  registerBtn.dataset.disabled = (selectedClientIndex == null) ? 'true' : 'false';
+  registerBtn.classList.toggle('disabled-look', selectedClientIndex == null);
+  updateSelectedLabel();
+}
+
+
+function crearFilaCliente(c, i){
+  const div = document.createElement('div');
+  div.className = 'client-chip';
+  const label = c.direccion ? `${escapeHtml(c.nombre)} <span style="color:#8A9793;">— ${escapeHtml(c.direccion)}</span>` : escapeHtml(c.nombre);
+  div.innerHTML = `<span>${label}</span>`;
+
+  const acciones = document.createElement('div');
+  acciones.style.cssText = 'display:flex; gap:10px; align-items:center; flex-shrink:0;';
+
+  const btnLink = document.createElement('button');
+  btnLink.textContent = 'Copiar link';
+  btnLink.style.cssText = 'background:none; color:var(--teal); font-family:var(--body); font-weight:600; font-size:13px; padding:2px;';
+  btnLink.onclick = async ()=>{
+    const url = new URL('cliente.html', location.href);
+    url.searchParams.set('nombre', c.nombre);
+    try{
+      await navigator.clipboard.writeText(url.toString());
+      setStatus('Link de ' + c.nombre + ' copiado. Pegalo en WhatsApp para mandárselo.', 'ok');
+    }catch(err){
+      prompt('Copiá este link a mano:', url.toString());
+    }
+  };
+
+  const btnQuitar = document.createElement('button');
+  btnQuitar.textContent = 'Quitar';
+  btnQuitar.onclick = async ()=>{
+    const ok = confirm('¿Seguro que querés quitar a "' + c.nombre + '" de la lista de clientes?');
+    if(!ok) return;
+    try{
+      await backendPost({ action:'deleteClient', nombre: c.nombre, direccion: c.direccion || '' });
+      const idx = clients.indexOf(c);
+      if(idx !== -1) clients.splice(idx,1);
+      renderClientSelect();
+      renderClientList();
+      setStatus('Cliente quitado: ' + c.nombre, 'ok');
+    }catch(err){ setStatus('No se pudo quitar: ' + err.message, 'err'); }
+  };
+
+  acciones.appendChild(btnLink);
+  acciones.appendChild(btnQuitar);
+  div.appendChild(acciones);
+  return div;
+}
+
+function renderClientList(){
+  const wrap = document.getElementById('clientList');
+  wrap.innerHTML = '';
+
+  if(clients.length === 0){
+    wrap.innerHTML = '<div class="empty" style="padding:16px 0;">Todavía no hay clientes cargados.</div>';
+    return;
+  }
+
+  const grupos = {};
+  DIAS_CANON.concat(['Otros']).forEach(d => grupos[d] = []);
+  clients.forEach((c, i)=>{
+    diasDeCliente(c).forEach(d => grupos[d].push(i));
+  });
+
+  DIAS_CANON.concat(['Otros']).forEach(d=>{
+    if(grupos[d].length === 0) return;
+
+    const section = document.createElement('div');
+    section.style.cssText = 'border:1px solid var(--line); border-radius:8px; margin-top:8px; overflow:hidden;';
+
+    const header = document.createElement('button');
+    header.type = 'button';
+    header.style.cssText = 'width:100%; text-align:left; background:var(--teal-deep); color:#fff; padding:11px 14px; font-family:var(--disp); font-weight:700; font-size:14px; border:none; display:flex; justify-content:space-between; align-items:center; cursor:pointer;';
+    const label = document.createElement('span');
+    label.textContent = (d === 'Otros' ? 'Otros / agregados a mano' : d) + ` (${grupos[d].length})`;
+    const arrow = document.createElement('span');
+    arrow.textContent = '▾';
+    arrow.className = 'acc-arrow-list';
+    header.appendChild(label);
+    header.appendChild(arrow);
+
+    const body = document.createElement('div');
+    body.className = 'acc-body-list';
+    body.style.cssText = 'display:none; background:#fff; padding:8px;';
+
+    grupos[d].forEach(i=>{
+      body.appendChild(crearFilaCliente(clients[i], i));
+    });
+
+    header.onclick = ()=>{
+      const isOpen = body.style.display === 'block';
+      body.style.display = isOpen ? 'none' : 'block';
+      arrow.textContent = isOpen ? '▾' : '▴';
+    };
+
+    section.appendChild(header);
+    section.appendChild(body);
+    wrap.appendChild(section);
+  });
+}
+
+document.getElementById('toggleClientListBtn').onclick = ()=>{
+  const listEl = document.getElementById('clientList');
+  const btn = document.getElementById('toggleClientListBtn');
+  const visible = listEl.style.display !== 'none';
+  listEl.style.display = visible ? 'none' : 'block';
+  btn.textContent = visible ? 'Ver lista completa de clientes' : 'Ocultar lista de clientes';
+};
+
+document.getElementById('addClientBtn').onclick = async ()=>{
+  const input = document.getElementById('newClientInput');
+  const addrInput = document.getElementById('newClientAddrInput');
+  const name = input.value.trim();
+  const addr = addrInput.value.trim();
+  if(!name){
+    setStatus('Escribí un nombre antes de tocar Agregar (esto es solo para clientes nuevos, los que ya existen se eligen arriba en el desplegable).', 'err');
+    return;
+  }
+  try{
+    await backendPost({ action:'addClient', nombre: name, direccion: addr });
+    clients.push({ nombre: name, direccion: addr });
+    input.value = '';
+    addrInput.value = '';
+    renderClientSelect();
+    renderClientList();
+    setStatus('Cliente agregado: ' + name, 'ok');
+  }catch(err){
+    setStatus('No se pudo agregar: ' + err.message, 'err');
+  }
+};
+
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+// --- Registrar visita ---
+document.getElementById('registerBtn').addEventListener('click', (e)=>{
+  if(e.currentTarget.dataset.disabled === 'true'){
+    e.preventDefault();
+    setStatus('Agregá o elegí un cliente primero.', 'err');
+    return;
+  }
+  if(!backendUrl){
+    e.preventDefault();
+    setStatus('Conectá el backend arriba antes de registrar un servicio.', 'err');
+    return;
+  }
+  pendingPositionPromise = getPosition();
+  setStatus('Pidiendo permiso de ubicación y abriendo la cámara...');
+});
+
+document.getElementById('photoInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const clientObj = (selectedClientIndex != null) ? clients[selectedClientIndex] : null;
+  if(!clientObj){
+    setStatus('Elegí un cliente primero (tocá un día para desplegarlo).', 'err');
+    return;
+  }
+  const clientLabel = clientObj.direccion ? `${clientObj.nombre} — ${clientObj.direccion}` : clientObj.nombre;
+  setStatus('Procesando foto...');
+
+  let lat = null, lon = null;
+  let geoErrorReason = null;
+  try{
+    if(!pendingPositionPromise) pendingPositionPromise = getPosition();
+    const pos = await pendingPositionPromise;
+    lat = pos.coords.latitude;
+    lon = pos.coords.longitude;
+  }catch(err){
+    geoErrorReason = describeGeoError(err);
+  }
+  pendingPositionPromise = null;
+
+  try{
+    const now = new Date();
+    const stampText = [
+      clientLabel,
+      now.toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'numeric'}) + '  ' + formatTime(now),
+      (lat != null) ? `${lat.toFixed(5)}, ${lon.toFixed(5)}` : 'Ubicación no disponible'
+    ];
+    const dataUrl = await resizeImage(file, 900, 0.7, stampText);
+
+    setStatus('Subiendo foto y guardando el registro...');
+    const id = 'r' + now.getTime() + Math.random().toString(36).slice(2,6);
+    const resp = await backendPost({
+      action: 'addRecord',
+      id, cliente: clientObj.nombre, direccion: clientObj.direccion || '',
+      fechaISO: now.toISOString(), lat, lon, ubicacionManual: '',
+      fotoBase64: dataUrl
+    });
+
+    const record = {
+      id,
+      cliente: clientObj.nombre,
+      direccion: clientObj.direccion || '',
+      telefono: clientObj.telefono || '',
+      fechaISO: now.toISOString(),
+      foto: resp.fotoUrl || dataUrl,
+      lat, lon,
+      ubicacionManual: ''
+    };
+    records.unshift(record);
+    renderHistory();
+    const ubicOk = lat != null ? ' (con ubicación)' : ` (sin ubicación: ${geoErrorReason || 'motivo desconocido'})`;
+    setStatus('Registrado: ' + clientObj.nombre + ' — ' + formatTime(now) + ubicOk, lat != null ? 'ok' : 'err');
+  }catch(err){
+    setStatus('Error al guardar el registro: ' + err.message, 'err');
+  }
+  e.target.value = '';
+});
+
+function describeGeoError(err){
+  if(err && typeof err.code === 'number'){
+    if(err.code === 1) return 'permiso denegado, revisá los permisos de ubicación del navegador';
+    if(err.code === 2) return 'posición no disponible';
+    if(err.code === 3) return 'se agotó el tiempo de espera';
+  }
+  if(err && err.message) return err.message;
+  return 'motivo desconocido';
+}
+
+function getPosition(){
+  return new Promise((resolve, reject)=>{
+    if(!navigator.geolocation){ reject(new Error('el navegador no soporta geolocalización')); return; }
+    navigator.geolocation.getCurrentPosition(resolve, reject, {enableHighAccuracy:true, timeout:8000});
+  });
+}
+
+async function getClimaMomento(lat, lon){
+  try{
+    const controller = new AbortController();
+    const timer = setTimeout(()=> controller.abort(), 6000);
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    const data = await res.json();
+    const cw = data && data.current_weather;
+    if(!cw || cw.temperature == null) return null;
+    const temp = Math.round(cw.temperature * 10) / 10;
+    const viento = Math.round(cw.windspeed);
+    return `Clima en el momento: ${temp}°C · viento ${viento} km/h`;
+  }catch(err){
+    return null; // si falla, seguimos sin esa línea, no rompe el registro
+  }
+}
+
+function resizeImage(file, maxDim, quality, stampLines){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (e)=>{ img.src = e.target.result; };
+    reader.onerror = reject;
+    img.onload = ()=>{
+      let w = img.width, h = img.height;
+      if(w > h && w > maxDim){ h = h * maxDim / w; w = maxDim; }
+      else if(h > maxDim){ w = w * maxDim / h; h = maxDim; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+
+      if(stampLines && stampLines.length){
+        const pad = Math.max(8, w * 0.02);
+        const fontSize = Math.max(12, Math.round(w * 0.032));
+        const lineHeight = fontSize * 1.35;
+        const barHeight = pad * 2 + stampLines.length * lineHeight;
+        ctx.fillStyle = 'rgba(11, 53, 53, 0.72)';
+        ctx.fillRect(0, h - barHeight, w, barHeight);
+        ctx.font = `600 ${fontSize}px 'IBM Plex Mono', monospace`;
+        ctx.fillStyle = '#EFF7F5';
+        ctx.textBaseline = 'top';
+        stampLines.forEach((line, i)=>{
+          ctx.fillText(line, pad, h - barHeight + pad + i * lineHeight);
+        });
+      }
+
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function exportToExcel(){
+  if(records.length === 0){
+    setStatus('No hay registros para exportar todavía.', 'err');
+    return;
+  }
+  const rows = records.map(rec=>{
+    const d = new Date(rec.fechaISO);
+    return {
+      'Código': rec.id.toUpperCase(),
+      'Cliente / Lugar': rec.cliente,
+      'Dirección': rec.direccion || '',
+      'Fecha': d.toLocaleDateString('es-AR'),
+      'Hora': formatTime(d),
+      'Latitud': rec.lat != null ? rec.lat : '',
+      'Longitud': rec.lon != null ? rec.lon : '',
+      'Enlace ubicación': rec.lat != null ? `https://maps.google.com/?q=${rec.lat},${rec.lon}` : (rec.ubicacionManual || ''),
+      'Foto': rec.foto || ''
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:14},{wch:24},{wch:28},{wch:12},{wch:8},{wch:12},{wch:12},{wch:38},{wch:38}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Servicios');
+  const fileName = 'servicios_' + new Date().toISOString().slice(0,10) + '.xlsx';
+  XLSX.writeFile(wb, fileName);
+}
+document.getElementById('exportBtn').onclick = exportToExcel;
+
+function formatTime(d){
+  return d.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+}
+function formatDateTime(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'2-digit'}) + '  ' + formatTime(d);
+}
+
+function renderHistory(){
+  const wrap = document.getElementById('historyList');
+  wrap.innerHTML = '';
+  if(records.length === 0){
+    wrap.innerHTML = '<div class="empty">Todavía no hay servicios registrados.</div>';
+    return;
+  }
+  records.forEach(rec=>{
+    const div = document.createElement('div');
+    div.className = 'ticket';
+    const direccionLine = rec.direccion ? `<div style="margin-bottom:4px;">${escapeHtml(rec.direccion)}</div>` : '';
+
+    let ubicacionBlock;
+    if(rec.lat != null){
+      ubicacionBlock = `<a href="https://maps.google.com/?q=${rec.lat},${rec.lon}" target="_blank">Ver ubicación (GPS)</a>`;
+    } else if(rec.ubicacionManual){
+      ubicacionBlock = `<a href="${escapeHtml(rec.ubicacionManual)}" target="_blank">Ver ubicación (pegada a mano)</a> <button class="btn-manual-loc" data-id="${rec.id}" style="margin-left:6px; font-size:11px; padding:3px 8px; background:none; border:1px solid var(--line); color:var(--teal); border-radius:6px;">Editar</button>`;
+    } else {
+      ubicacionBlock = `Sin ubicación
+        <div style="display:flex; gap:6px; margin-top:6px;">
+          <input class="manual-loc-input" data-id="${rec.id}" placeholder="Pegá acá el link de Google Maps" style="flex:1; font-size:12px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;">
+          <button class="btn-manual-loc" data-id="${rec.id}" style="font-size:12px; padding:6px 10px; background:var(--teal); color:#fff; border-radius:6px;">Guardar</button>
+        </div>`;
+    }
+
+    div.innerHTML = `
+      <div class="ticket-top">
+        <div class="ticket-client">${escapeHtml(rec.cliente)}</div>
+        <div class="ticket-code">${rec.id.toUpperCase()}</div>
+      </div>
+      <div class="ticket-time">${formatDateTime(rec.fechaISO)}</div>
+      <div class="ticket-body">
+        <img class="ticket-photo" src="${rec.foto}">
+        <div class="ticket-info">${direccionLine}${ubicacionBlock}</div>
+      </div>
+      <div class="ticket-actions">
+        <button class="btn-wa" data-id="${rec.id}">Enviar por WhatsApp</button>
+        <button class="btn-del" data-id="${rec.id}">Eliminar</button>
+      </div>
+    `;
+    wrap.appendChild(div);
+  });
+
+  wrap.querySelectorAll('.ticket-photo').forEach(img=>{
+    img.onclick = ()=>{
+      document.getElementById('lightboxImg').src = img.src;
+      document.getElementById('lightbox').classList.add('open');
+    };
+  });
+  wrap.querySelectorAll('.btn-wa').forEach(btn=>{
+    btn.onclick = ()=> sendWhatsApp(btn.dataset.id);
+  });
+  wrap.querySelectorAll('.btn-del').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const rec = records.find(r=>r.id === btn.dataset.id);
+      const nombreRec = rec ? rec.cliente : '';
+      const ok = confirm('¿Seguro que querés eliminar este registro' + (nombreRec ? ' de "' + nombreRec + '"' : '') + '? No se puede deshacer.');
+      if(!ok) return;
+      try{
+        await backendPost({ action:'deleteRecord', id: btn.dataset.id });
+        records = records.filter(r=>r.id !== btn.dataset.id);
+        renderHistory();
+        setStatus('Registro eliminado.', 'ok');
+      }catch(err){ setStatus('No se pudo eliminar: ' + err.message, 'err'); }
+    };
+  });
+  wrap.querySelectorAll('.btn-manual-loc').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const id = btn.dataset.id;
+      const rec = records.find(r=>r.id===id);
+      if(!rec) return;
+      const current = rec.ubicacionManual || '';
+      const input = wrap.querySelector(`.manual-loc-input[data-id="${id}"]`);
+      const value = input ? input.value.trim() : (prompt('Pegá el link de Google Maps para este servicio:', current) || '').trim();
+      if(!value) return;
+      try{
+        await backendPost({ action:'updateRecordLocation', id, ubicacionManual: value });
+        rec.ubicacionManual = value;
+        renderHistory();
+        setStatus('Ubicación guardada a mano para ' + rec.cliente, 'ok');
+      }catch(err){
+        setStatus('No se pudo guardar la ubicación: ' + err.message, 'err');
+      }
+    };
+  });
+}
+
+async function sendWhatsApp(id){
+  const rec = records.find(r=>r.id===id);
+  if(!rec) return;
+  const empresa = config.companyName ? config.companyName + ' — ' : '';
+  const ubicacionLink = (rec.lat != null) ? `https://maps.google.com/?q=${rec.lat},${rec.lon}` : (rec.ubicacionManual || '');
+  const mapPart = ubicacionLink ? `\nUbicación: ${ubicacionLink}` : '';
+  const direccionPart = rec.direccion ? `\nDirección: ${rec.direccion}` : '';
+  const text = `${empresa}Servicio realizado\nCliente/lugar: ${rec.cliente}${direccionPart}\nFecha y hora: ${formatDateTime(rec.fechaISO)}${mapPart}`;
+
+  // Buscamos el teléfono: primero el que quedó guardado en el registro, si no, lo buscamos por nombre en la lista de clientes actual
+  let telefono = rec.telefono || '';
+  if(!telefono){
+    const match = clients.find(c => c.nombre === rec.cliente && c.telefono);
+    if(match) telefono = match.telefono;
+  }
+  telefono = telefono.replace(/\D/g, ''); // solo números
+
+  try{
+    const resp = await fetch(rec.foto);
+    const blob = await resp.blob();
+    const file = new File([blob], 'servicio.jpg', {type:'image/jpeg'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      // Nota: el selector nativo de compartir no permite elegir el contacto de antemano,
+      // así que igual hay que elegir el chat de WhatsApp a mano ahí.
+      await navigator.share({files:[file], text});
+      return;
+    }
+  }catch(err){ /* seguimos al fallback */ }
+
+  const base = telefono ? `https://wa.me/${telefono}` : 'https://wa.me/';
+  window.open(base + '?text=' + encodeURIComponent(text), '_blank');
+}
+
+// ---------- Arranque ----------
+todayLabel();
+backendUrl = localStorage.getItem(BACKEND_URL_KEY) || '';
+document.getElementById('backendUrlInput').value = backendUrl;
+loadAll();
+
+if(location.protocol === 'file:' || location.protocol === 'content:'){
+  showFatalError('Este archivo se abrió desde "' + location.protocol + '" y ese acceso no tiene permiso de ubicación. Abrí la página con su dirección https:// (por ejemplo, la de GitHub Pages) en vez del archivo descargado.');
+}
+
+// Pedimos el permiso de ubicación apenas carga la página (no bloquea nada),
+// así para cuando saquen la primera foto el permiso ya está resuelto.
+if(navigator.geolocation){
+  navigator.geolocation.getCurrentPosition(
+    ()=>{ /* permiso concedido, no hace falta hacer nada más acá */ },
+    ()=>{ /* el usuario todavía no decidió o lo denegó, no pasa nada, se reintenta al sacar la foto */ },
+    { enableHighAccuracy:true, timeout:8000 }
+  );
+}
+</script>
+
+</body>
+</html>

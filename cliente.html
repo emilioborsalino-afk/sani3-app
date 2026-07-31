@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Mi historial de servicios</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+  :root{
+    --bg: #F3F6F5;
+    --ink: #15211E;
+    --teal: #114B4B;
+    --teal-deep: #0B3535;
+    --card: #FFFFFF;
+    --line: #D8E0DE;
+    --mono: 'IBM Plex Mono', monospace;
+    --disp: 'Barlow Semi Condensed', sans-serif;
+    --body: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--body);
+    min-height:100vh;
+    padding-bottom:40px;
+  }
+  .topbar{
+    background:var(--teal);
+    color:#EFF7F5;
+    padding:20px;
+    position:sticky;
+    top:0;
+    z-index:10;
+    box-shadow:0 2px 10px rgba(0,0,0,0.12);
+  }
+  .topbar h1{
+    font-family:var(--disp);
+    font-weight:800;
+    font-size:20px;
+    margin:0;
+  }
+  .topbar .sub{
+    font-family:var(--mono);
+    font-size:12px;
+    color:#9FC2BC;
+    margin-top:4px;
+  }
+  main{
+    max-width:520px;
+    margin:0 auto;
+    padding:18px 16px 0;
+  }
+  .ticket{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    margin-top:14px;
+    padding:14px;
+  }
+  .ticket-time{
+    font-family:var(--mono); font-size:13px; color:#3C4A46;
+  }
+  .ticket-photo{
+    width:100%; border-radius:8px; margin-top:10px; display:block; cursor:pointer;
+  }
+  .ticket-info{font-size:13px; color:#4A5854; margin-top:8px; line-height:1.5;}
+  .ticket-info a{color:var(--teal); text-decoration:none; font-weight:600;}
+  .empty, .loading, .error{
+    text-align:center; color:#8A9793; font-size:14px; padding:40px 16px;
+    font-family:var(--mono);
+  }
+  .error{color:#B4432B;}
+  .lightbox{
+    position:fixed; inset:0; background:rgba(10,20,18,0.9);
+    display:none; align-items:center; justify-content:center; z-index:50; padding:20px;
+  }
+  .lightbox.open{display:flex;}
+  .lightbox img{max-width:100%; max-height:100%; border-radius:8px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1 id="clienteNombre">Mi historial</h1>
+  <div class="sub">Registro de limpiezas realizadas</div>
+</div>
+
+<main id="main">
+  <div class="loading">Cargando tu historial...</div>
+</main>
+
+<div class="lightbox" id="lightbox" onclick="this.classList.remove('open')">
+  <img id="lightboxImg" src="">
+</div>
+
+<script>
+const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbxfGtx6vPMVW7yh8ZB2MREZybPBAmkgEgT6K9aumXNfn_8yDSIRY_QWhP-E_gQEVT9MfA/exec';
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function formatTime(d){
+  return d.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+}
+function formatDateTime(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'numeric'}) + '  ' + formatTime(d);
+}
+
+function cargarJSONP(url){
+  return new Promise((resolve, reject)=>{
+    const cbName = 'jsonp_cb_' + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+    const timer = setTimeout(()=>{ limpiar(); reject(new Error('se agotó el tiempo de espera')); }, 12000);
+    function limpiar(){
+      clearTimeout(timer);
+      delete window[cbName];
+      script.remove();
+    }
+    window[cbName] = (data)=>{ limpiar(); resolve(data); };
+    script.onerror = ()=>{ limpiar(); reject(new Error('no se pudo conectar al servidor')); };
+    script.src = url + (url.indexOf('?') > -1 ? '&' : '?') + 'callback=' + cbName;
+    document.body.appendChild(script);
+  });
+}
+
+async function cargar(){
+  const params = new URLSearchParams(location.search);
+  const nombre = (params.get('nombre') || '').trim();
+  const main = document.getElementById('main');
+
+  if(!nombre){
+    document.getElementById('clienteNombre').textContent = 'Falta el nombre';
+    main.innerHTML = '<div class="error">Este link no incluye tu nombre. Pedile a Sani3 que te reenvíe el link correcto.</div>';
+    return;
+  }
+
+  document.getElementById('clienteNombre').textContent = nombre;
+
+  try{
+    const records = await cargarJSONP(BACKEND_URL + '?action=recordsFor&cliente=' + encodeURIComponent(nombre));
+    if(records && records.error) throw new Error(records.error);
+
+    if(!records || records.length === 0){
+      main.innerHTML = '<div class="empty">Todavía no hay servicios registrados a tu nombre.</div>';
+      return;
+    }
+
+    main.innerHTML = '';
+    records.forEach(rec=>{
+      const div = document.createElement('div');
+      div.className = 'ticket';
+      const ubicacionLink = (rec.lat != null)
+        ? `<a href="https://maps.google.com/?q=${rec.lat},${rec.lon}" target="_blank">Ver ubicación</a>`
+        : (rec.ubicacionManual ? `<a href="${escapeHtml(rec.ubicacionManual)}" target="_blank">Ver ubicación</a>` : '');
+      div.innerHTML = `
+        <div class="ticket-time">${formatDateTime(rec.fechaISO)}</div>
+        ${rec.foto ? `<img class="ticket-photo" src="${rec.foto}">` : ''}
+        <div class="ticket-info">${rec.direccion ? escapeHtml(rec.direccion) + '<br>' : ''}${ubicacionLink}</div>
+      `;
+      main.appendChild(div);
+    });
+
+    main.querySelectorAll('.ticket-photo').forEach(img=>{
+      img.onclick = ()=>{
+        document.getElementById('lightboxImg').src = img.src;
+        document.getElementById('lightbox').classList.add('open');
+      };
+    });
+  }catch(err){
+    main.innerHTML = '<div class="error">No se pudo cargar el historial: ' + escapeHtml(err.message) + '</div>';
+  }
+}
+
+cargar();
+</script>
+
+</body>
+</html>

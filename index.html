@@ -261,7 +261,10 @@
       <input class="client-input" id="newClientAddrInput" placeholder="Dirección / ubicación">
       <button class="btn-small" id="addClientBtn">Agregar</button>
     </div>
-    <button type="button" id="buscarMapsNuevoClienteBtn" style="width:100%; margin-top:8px; background:none; color:var(--teal); font-family:var(--body); font-weight:600; font-size:12.5px; padding:6px; border:1px dashed var(--line); border-radius:6px;">📍 Abrir Google Maps para buscar el lugar</button>
+    <div style="display:flex; gap:8px; margin-top:8px;">
+      <button type="button" id="usarMiUbicacionNuevoClienteBtn" style="flex:1; background:var(--green); color:#fff; font-family:var(--body); font-weight:600; font-size:12.5px; padding:7px; border-radius:6px;">📍 Usar mi ubicación actual</button>
+      <button type="button" id="buscarMapsNuevoClienteBtn" style="flex:1; background:var(--teal); color:#fff; font-family:var(--body); font-weight:600; font-size:12.5px; padding:7px; border-radius:6px;">🗺️ Abrir Maps</button>
+    </div>
     <button id="toggleClientListBtn" style="width:100%; margin-top:10px; background:none; color:var(--teal); font-family:var(--body); font-weight:600; font-size:13px; padding:8px;">Ver lista completa de clientes</button>
     <div id="clientList" style="display:none;"></div>
   </div>
@@ -655,6 +658,23 @@ document.getElementById('buscarMapsNuevoClienteBtn').onclick = (e)=>{
   abrirMapsEnMiUbicacion(e.currentTarget);
 };
 
+document.getElementById('usarMiUbicacionNuevoClienteBtn').onclick = async (e)=>{
+  const btn = e.currentTarget;
+  const textoOriginal = btn.textContent;
+  btn.textContent = 'Ubicando...';
+  btn.disabled = true;
+  try{
+    const pos = await getPosition();
+    const link = `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`;
+    document.getElementById('newClientAddrInput').value = link;
+    setStatus('Ubicación actual cargada en el campo de dirección.', 'ok');
+  }catch(err){
+    setStatus('No se pudo obtener la ubicación: ' + describeGeoError(err), 'err');
+  }
+  btn.textContent = textoOriginal;
+  btn.disabled = false;
+};
+
 document.getElementById('addClientBtn').onclick = async ()=>{
   const input = document.getElementById('newClientInput');
   const addrInput = document.getElementById('newClientAddrInput');
@@ -997,28 +1017,19 @@ async function sendWhatsApp(id){
   const direccionPart = rec.direccion ? `\nDirección: ${rec.direccion}` : '';
   const text = `${empresa}Servicio realizado\nCliente/lugar: ${rec.cliente}${direccionPart}\nFecha y hora: ${formatDateTime(rec.fechaISO)}${mapPart}`;
 
-  // Buscamos el teléfono: primero el que quedó guardado en el registro, si no, lo buscamos por nombre en la lista de clientes actual
-  let telefono = rec.telefono || '';
-  if(!telefono){
-    const match = clients.find(c => c.nombre === rec.cliente && c.telefono);
-    if(match) telefono = match.telefono;
-  }
-  telefono = telefono.replace(/\D/g, ''); // solo números
-
+  // A propósito NO apuntamos a ningún número de teléfono: el que use la app
+  // elige el contacto a mano cada vez, así los empleados no le escriben directo a los clientes.
   try{
     const resp = await fetch(rec.foto);
     const blob = await resp.blob();
     const file = new File([blob], 'servicio.jpg', {type:'image/jpeg'});
     if(navigator.canShare && navigator.canShare({files:[file]})){
-      // Nota: el selector nativo de compartir no permite elegir el contacto de antemano,
-      // así que igual hay que elegir el chat de WhatsApp a mano ahí.
       await navigator.share({files:[file], text});
       return;
     }
   }catch(err){ /* seguimos al fallback */ }
 
-  const base = telefono ? `https://wa.me/${telefono}` : 'https://wa.me/';
-  window.open(base + '?text=' + encodeURIComponent(text), '_blank');
+  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
 }
 
 // ---------- Arranque ----------

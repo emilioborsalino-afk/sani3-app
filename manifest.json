@@ -1,12 +1,20 @@
 {
+  "id": "/sani3-app/",
   "name": "Sani3 - Registro de Servicios",
   "short_name": "Sani3",
+  "description": "Registro de limpiezas de baños químicos Sani3, con foto, ubicación y fecha.",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#F3F6F5",
   "theme_color": "#114B4B",
+  "lang": "es-AR",
+  "categories": ["business", "productivity"],
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

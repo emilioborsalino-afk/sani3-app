@@ -261,6 +261,7 @@
       <input class="client-input" id="newClientAddrInput" placeholder="Dirección / ubicación">
       <button class="btn-small" id="addClientBtn">Agregar</button>
     </div>
+    <button type="button" id="buscarMapsNuevoClienteBtn" style="width:100%; margin-top:8px; background:none; color:var(--teal); font-family:var(--body); font-weight:600; font-size:12.5px; padding:6px; border:1px dashed var(--line); border-radius:6px;">📍 Abrir Google Maps para buscar el lugar</button>
     <button id="toggleClientListBtn" style="width:100%; margin-top:10px; background:none; color:var(--teal); font-family:var(--body); font-weight:600; font-size:13px; padding:8px;">Ver lista completa de clientes</button>
     <div id="clientList" style="display:none;"></div>
   </div>
@@ -618,6 +619,14 @@ document.getElementById('toggleClientListBtn').onclick = ()=>{
   btn.textContent = visible ? 'Ver lista completa de clientes' : 'Ocultar lista de clientes';
 };
 
+document.getElementById('buscarMapsNuevoClienteBtn').onclick = ()=>{
+  const nombre = document.getElementById('newClientInput').value.trim();
+  const addr = document.getElementById('newClientAddrInput').value.trim();
+  const query = [nombre, addr].filter(Boolean).join(' ');
+  const url = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(query || 'Río Tercero');
+  window.open(url, '_blank');
+};
+
 document.getElementById('addClientBtn').onclick = async ()=>{
   const input = document.getElementById('newClientInput');
   const addrInput = document.getElementById('newClientAddrInput');
@@ -847,9 +856,11 @@ function renderHistory(){
     } else if(rec.ubicacionManual){
       ubicacionBlock = `<a href="${escapeHtml(rec.ubicacionManual)}" target="_blank">Ver ubicación (pegada a mano)</a> <button class="btn-manual-loc" data-id="${rec.id}" style="margin-left:6px; font-size:11px; padding:3px 8px; background:none; border:1px solid var(--line); color:var(--teal); border-radius:6px;">Editar</button>`;
     } else {
+      const busqueda = encodeURIComponent([rec.cliente, rec.direccion].filter(Boolean).join(' '));
       ubicacionBlock = `Sin ubicación
         <div style="display:flex; gap:6px; margin-top:6px;">
-          <input class="manual-loc-input" data-id="${rec.id}" placeholder="Pegá acá el link de Google Maps" style="flex:1; font-size:12px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;">
+          <button class="btn-buscar-maps" data-busqueda="${busqueda}" style="font-size:12px; padding:6px 8px; background:none; border:1px dashed var(--line); color:var(--teal); border-radius:6px; white-space:nowrap;">📍 Abrir Maps</button>
+          <input class="manual-loc-input" data-id="${rec.id}" placeholder="Pegá acá el link" style="flex:1; font-size:12px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;">
           <button class="btn-manual-loc" data-id="${rec.id}" style="font-size:12px; padding:6px 10px; background:var(--teal); color:#fff; border-radius:6px;">Guardar</button>
         </div>`;
     }
@@ -893,6 +904,12 @@ function renderHistory(){
         renderHistory();
         setStatus('Registro eliminado.', 'ok');
       }catch(err){ setStatus('No se pudo eliminar: ' + err.message, 'err'); }
+    };
+  });
+  wrap.querySelectorAll('.btn-buscar-maps').forEach(btn=>{
+    btn.onclick = ()=>{
+      const url = 'https://www.google.com/maps/search/?api=1&query=' + btn.dataset.busqueda;
+      window.open(url, '_blank');
     };
   });
   wrap.querySelectorAll('.btn-manual-loc').forEach(btn=>{
@@ -950,6 +967,10 @@ async function sendWhatsApp(id){
 }
 
 // ---------- Arranque ----------
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+
 todayLabel();
 backendUrl = localStorage.getItem(BACKEND_URL_KEY) || '';
 document.getElementById('backendUrlInput').value = backendUrl;

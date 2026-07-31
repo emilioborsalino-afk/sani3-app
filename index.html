@@ -534,7 +534,7 @@ function crearFilaCliente(c, i){
 
   const btnLink = document.createElement('button');
   btnLink.textContent = 'Copiar link';
-  btnLink.style.cssText = 'background:none; color:var(--teal); font-family:var(--body); font-weight:600; font-size:13px; padding:2px;';
+  btnLink.style.cssText = 'background:none; color:#B5711A; font-family:var(--body); font-weight:600; font-size:13px; padding:2px;';
   btnLink.onclick = async ()=>{
     const anteriores = prompt(
       '¿Este cliente tuvo algún nombre anterior en tu planilla (por ejemplo, si le corregiste el nombre)?\n\nSi tuvo, escribilo acá (si fueron varios, separalos con coma). Si no tuvo, dejá vacío y tocá Aceptar.',
@@ -595,11 +595,11 @@ function renderClientList(){
     if(grupos[d].length === 0) return;
 
     const section = document.createElement('div');
-    section.style.cssText = 'border:1px solid var(--line); border-radius:8px; margin-top:8px; overflow:hidden;';
+    section.style.cssText = 'border:1px solid #E8C89A; border-radius:8px; margin-top:8px; overflow:hidden;';
 
     const header = document.createElement('button');
     header.type = 'button';
-    header.style.cssText = 'width:100%; text-align:left; background:var(--teal-deep); color:#fff; padding:11px 14px; font-family:var(--disp); font-weight:700; font-size:14px; border:none; display:flex; justify-content:space-between; align-items:center; cursor:pointer;';
+    header.style.cssText = 'width:100%; text-align:left; background:var(--amber); color:#fff; padding:11px 14px; font-family:var(--disp); font-weight:700; font-size:14px; border:none; display:flex; justify-content:space-between; align-items:center; cursor:pointer;';
     const label = document.createElement('span');
     label.textContent = (d === 'Otros' ? 'Otros / agregados a mano' : d) + ` (${grupos[d].length})`;
     const arrow = document.createElement('span');

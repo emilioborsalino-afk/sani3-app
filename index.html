@@ -885,12 +885,16 @@ function renderHistory(){
       ubicacionBlock = `<a href="${escapeHtml(rec.ubicacionManual)}" target="_blank">Ver ubicación (pegada a mano)</a> <button class="btn-manual-loc" data-id="${rec.id}" style="margin-left:6px; font-size:11px; padding:3px 8px; background:none; border:1px solid var(--line); color:var(--teal); border-radius:6px;">Editar</button>`;
     } else {
       ubicacionBlock = `Sin ubicación
-        <div style="margin-top:6px;">
-          <button class="btn-buscar-maps" style="width:100%; box-sizing:border-box; font-size:12px; padding:7px 8px; background:none; border:1px dashed var(--line); color:var(--teal); border-radius:6px;">📍 Abrir Maps</button>
-          <div style="display:flex; gap:6px; margin-top:6px; width:100%;">
-            <input class="manual-loc-input" data-id="${rec.id}" placeholder="Pegá acá el link" style="flex:1; min-width:0; box-sizing:border-box; font-size:12px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;">
-            <button class="btn-manual-loc" data-id="${rec.id}" style="flex-shrink:0; font-size:12px; padding:6px 10px; background:var(--teal); color:#fff; border-radius:6px;">Guardar</button>
-          </div>
+        <div style="margin-top:6px; display:flex; flex-direction:column; gap:6px;">
+          <button class="btn-usar-mi-ubicacion" data-id="${rec.id}" style="width:100%; box-sizing:border-box; font-size:12px; padding:8px; background:var(--green); color:#fff; border-radius:6px;">📍 Usar mi ubicación actual</button>
+          <button class="btn-buscar-maps" style="width:100%; box-sizing:border-box; font-size:12px; padding:8px; background:var(--teal); color:#fff; border-radius:6px;">🗺️ Abrir Maps y compartir ubicación</button>
+          <details style="font-size:11px; color:#8A9793;">
+            <summary style="cursor:pointer;">¿No podés compartir? Pegar un link a mano</summary>
+            <div style="display:flex; gap:6px; margin-top:6px;">
+              <input class="manual-loc-input" data-id="${rec.id}" placeholder="Pegá acá el link" style="flex:1; min-width:0; box-sizing:border-box; font-size:12px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;">
+              <button class="btn-manual-loc" data-id="${rec.id}" style="flex-shrink:0; font-size:12px; padding:6px 10px; background:var(--teal); color:#fff; border-radius:6px;">Guardar</button>
+            </div>
+          </details>
         </div>`;
     }
 
@@ -936,7 +940,32 @@ function renderHistory(){
     };
   });
   wrap.querySelectorAll('.btn-buscar-maps').forEach(btn=>{
-    btn.onclick = (e)=>{ abrirMapsEnMiUbicacion(e.currentTarget); };
+    btn.onclick = (e)=>{
+      abrirMapsEnMiUbicacion(e.currentTarget);
+      setStatus('En Maps: buscá el lugar, tocá "Compartir" y elegí "Sani3" en la lista de apps.', 'ok');
+    };
+  });
+  wrap.querySelectorAll('.btn-usar-mi-ubicacion').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const id = btn.dataset.id;
+      const rec = records.find(r=>r.id===id);
+      if(!rec) return;
+      const textoOriginal = btn.textContent;
+      btn.textContent = 'Ubicando...';
+      btn.disabled = true;
+      try{
+        const pos = await getPosition();
+        const link = `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`;
+        await backendPost({ action:'updateRecordLocation', id, ubicacionManual: link });
+        rec.ubicacionManual = link;
+        renderHistory();
+        setStatus('Ubicación actual guardada para ' + rec.cliente, 'ok');
+      }catch(err){
+        setStatus('No se pudo obtener la ubicación: ' + describeGeoError(err), 'err');
+        btn.textContent = textoOriginal;
+        btn.disabled = false;
+      }
+    };
   });
   wrap.querySelectorAll('.btn-manual-loc').forEach(btn=>{
     btn.onclick = async ()=>{

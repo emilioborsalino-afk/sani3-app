@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Guardar ubicación</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+  :root{
+    --bg: #F3F6F5; --ink: #15211E; --teal: #114B4B; --teal-deep: #0B3535;
+    --green: #2E7D5B; --card: #FFFFFF; --line: #D8E0DE;
+    --mono: 'IBM Plex Mono', monospace; --disp: 'Barlow Semi Condensed', sans-serif; --body: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--bg); color:var(--ink); font-family:var(--body); min-height:100vh; padding-bottom:40px;}
+  .topbar{background:var(--teal); color:#EFF7F5; padding:20px; position:sticky; top:0;}
+  .topbar h1{font-family:var(--disp); font-weight:800; font-size:19px; margin:0;}
+  .topbar .sub{font-family:var(--mono); font-size:12px; color:#9FC2BC; margin-top:4px;}
+  main{max-width:520px; margin:0 auto; padding:18px 16px 0;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; margin-top:12px;}
+  .card:active{background:#F0F5F3;}
+  .cliente{font-family:var(--disp); font-weight:700; font-size:16px; color:var(--teal-deep);}
+  .detalle{font-size:13px; color:#4A5854; margin-top:4px;}
+  .fecha{font-family:var(--mono); font-size:12px; color:#8A9793; margin-top:4px;}
+  .msg{text-align:center; color:#8A9793; font-size:14px; padding:40px 16px; font-family:var(--mono);}
+  .msg.ok{color:var(--green);}
+  .msg.err{color:#B4432B;}
+  button.card{width:100%; text-align:left; border:1px solid var(--line); cursor:pointer; font:inherit;}
+  .link-detectado{
+    font-family:var(--mono); font-size:11px; color:#4A5854; word-break:break-all;
+    background:#EFF7F5; border-radius:6px; padding:8px 10px; margin:0 16px 14px;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Guardar ubicación</h1>
+  <div class="sub">Elegí a qué servicio corresponde este lugar</div>
+</div>
+
+<div class="link-detectado" id="linkDetectado"></div>
+
+<main id="main">
+  <div class="msg">Cargando servicios pendientes de ubicación...</div>
+</main>
+
+<script>
+const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbxfGtx6vPMVW7yh8ZB2MREZybPBAmkgEgT6K9aumXNfn_8yDSIRY_QWhP-E_gQEVT9MfA/exec';
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function formatDateTime(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'2-digit'}) + '  ' +
+    d.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+}
+
+function cargarJSONP(url){
+  return new Promise((resolve, reject)=>{
+    const cbName = 'jsonp_cb_' + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+    const timer = setTimeout(()=>{ limpiar(); reject(new Error('se agotó el tiempo de espera')); }, 12000);
+    function limpiar(){ clearTimeout(timer); delete window[cbName]; script.remove(); }
+    window[cbName] = (data)=>{ limpiar(); resolve(data); };
+    script.onerror = ()=>{ limpiar(); reject(new Error('no se pudo conectar al servidor')); };
+    script.src = url + (url.indexOf('?') > -1 ? '&' : '?') + 'callback=' + cbName;
+    document.body.appendChild(script);
+  });
+}
+
+function extraerLink(texto){
+  if(!texto) return '';
+  const m = texto.match(/https?:\/\/\S+/);
+  return m ? m[0] : '';
+}
+
+async function init(){
+  const params = new URLSearchParams(location.search);
+  // Google Maps comparte normalmente en el campo "text" (a veces "url")
+  const compartido = params.get('text') || params.get('url') || params.get('title') || '';
+  const link = extraerLink(compartido);
+
+  const linkBox = document.getElementById('linkDetectado');
+  const main = document.getElementById('main');
+
+  if(!link){
+    linkBox.style.display = 'none';
+    main.innerHTML = '<div class="msg err">No detecté ningún link de ubicación. Volvé a Google Maps, tocá Compartir, y elegí esta app de nuevo.</div>';
+    return;
+  }
+  linkBox.textContent = '📍 ' + link;
+
+  try{
+    const records = await cargarJSONP(BACKEND_URL + '?action=recordsSinUbicacion');
+    if(records && records.error) throw new Error(records.error);
+
+    if(!records || records.length === 0){
+      main.innerHTML = '<div class="msg">No hay servicios pendientes de ubicación ahora mismo.</div>';
+      return;
+    }
+
+    main.innerHTML = '';
+    records.forEach(rec=>{
+      const btn = document.createElement('button');
+      btn.className = 'card';
+      btn.innerHTML = `
+        <div class="cliente">${escapeHtml(rec.cliente)}</div>
+        ${rec.direccion ? `<div class="detalle">${escapeHtml(rec.direccion)}</div>` : ''}
+        <div class="fecha">${formatDateTime(rec.fechaISO)}</div>
+      `;
+      btn.onclick = async ()=>{
+        main.innerHTML = '<div class="msg">Guardando...</div>';
+        try{
+          const resp = await cargarJSONP(BACKEND_URL + '?action=setUbicacionManualGet&id=' + encodeURIComponent(rec.id) + '&link=' + encodeURIComponent(link));
+          if(resp && resp.error) throw new Error(resp.error);
+          main.innerHTML = `<div class="msg ok">✓ Ubicación guardada para ${escapeHtml(rec.cliente)}.<br>Ya podés cerrar esta pestaña.</div>`;
+        }catch(err){
+          main.innerHTML = '<div class="msg err">No se pudo guardar: ' + escapeHtml(err.message) + '</div>';
+        }
+      };
+      main.appendChild(btn);
+    });
+  }catch(err){
+    main.innerHTML = '<div class="msg err">No se pudo cargar la lista: ' + escapeHtml(err.message) + '</div>';
+  }
+}
+
+init();
+</script>
+
+</body>
+</html>

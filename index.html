@@ -271,6 +271,10 @@
 
   <div class="section-label">Registrar visita — foto del frente de la obra</div>
   <div class="card">
+    <div id="ubicacionStatusRow" style="display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:13px;">
+      <span id="ubicacionStatusTexto" style="flex:1; color:#8A9793;">📍 Buscando tu ubicación...</span>
+      <button type="button" id="refrescarUbicacionBtn" style="background:none; color:var(--teal); font-family:var(--body); font-weight:600; font-size:12.5px; padding:5px 10px; border:1px solid var(--line); border-radius:6px;">🔄 Actualizar</button>
+    </div>
     <input type="file" accept="image/*" capture="environment" id="photoInput" style="position:absolute; width:1px; height:1px; opacity:0; overflow:hidden;">
     <label class="btn-main" id="registerBtn" for="photoInput">📷 Foto del frente de la obra y registrar</label>
     <div class="status-line" id="statusLine"></div>
@@ -302,7 +306,8 @@ let backendUrl = '';
 let clients = [];
 let records = [];
 let config = { companyName: 'Sani3' };
-let pendingPositionPromise = null;
+let ubicacionActual = null;      // {lat, lon} de la última vez que se consiguió bien
+let ubicacionActualHora = null;  // Date de cuándo se consiguió
 
 const CLIENTES_PRECARGADOS = []; // ya no se usa: los clientes se leen en vivo desde Registro Alquileres
 
@@ -702,6 +707,29 @@ function escapeHtml(s){
 }
 
 // --- Registrar visita ---
+async function refrescarUbicacion(){
+  const texto = document.getElementById('ubicacionStatusTexto');
+  const btn = document.getElementById('refrescarUbicacionBtn');
+  texto.textContent = '📍 Buscando tu ubicación...';
+  texto.style.color = '#8A9793';
+  if(btn) btn.disabled = true;
+  try{
+    const pos = await getPosition();
+    ubicacionActual = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+    ubicacionActualHora = new Date();
+    texto.textContent = '✓ Ubicación lista (' + formatTime(ubicacionActualHora) + ') — lista para sacar la foto';
+    texto.style.color = 'var(--green)';
+  }catch(err){
+    ubicacionActual = null;
+    ubicacionActualHora = null;
+    texto.textContent = '⚠ Sin ubicación (' + describeGeoError(err) + '). Tocá Actualizar para reintentar.';
+    texto.style.color = '#B4432B';
+  }
+  if(btn) btn.disabled = false;
+}
+
+document.getElementById('refrescarUbicacionBtn').onclick = refrescarUbicacion;
+
 document.getElementById('registerBtn').addEventListener('click', (e)=>{
   if(e.currentTarget.dataset.disabled === 'true'){
     e.preventDefault();
@@ -713,8 +741,7 @@ document.getElementById('registerBtn').addEventListener('click', (e)=>{
     setStatus('Conectá el backend arriba antes de registrar un servicio.', 'err');
     return;
   }
-  pendingPositionPromise = getPosition();
-  setStatus('Pidiendo permiso de ubicación y abriendo la cámara...');
+  setStatus('Abriendo la cámara...');
 });
 
 document.getElementById('photoInput').addEventListener('change', async (e)=>{
@@ -728,17 +755,16 @@ document.getElementById('photoInput').addEventListener('change', async (e)=>{
   const clientLabel = clientObj.direccion ? `${clientObj.nombre} — ${clientObj.direccion}` : clientObj.nombre;
   setStatus('Procesando foto...');
 
+  // Usamos la ubicación que ya se consiguió con el botón "Actualizar" (o al abrir la app).
+  // Así no dependemos de que el GPS responda justo en el momento de sacar la foto.
   let lat = null, lon = null;
   let geoErrorReason = null;
-  try{
-    if(!pendingPositionPromise) pendingPositionPromise = getPosition();
-    const pos = await pendingPositionPromise;
-    lat = pos.coords.latitude;
-    lon = pos.coords.longitude;
-  }catch(err){
-    geoErrorReason = describeGeoError(err);
+  if(ubicacionActual){
+    lat = ubicacionActual.lat;
+    lon = ubicacionActual.lon;
+  } else {
+    geoErrorReason = 'no se pudo conseguir antes de sacar la foto — tocá "Actualizar" arriba y esperá a que diga "lista" antes de sacar la próxima';
   }
-  pendingPositionPromise = null;
 
   try{
     const now = new Date();
@@ -1046,15 +1072,8 @@ if(location.protocol === 'file:' || location.protocol === 'content:'){
   showFatalError('Este archivo se abrió desde "' + location.protocol + '" y ese acceso no tiene permiso de ubicación. Abrí la página con su dirección https:// (por ejemplo, la de GitHub Pages) en vez del archivo descargado.');
 }
 
-// Pedimos el permiso de ubicación apenas carga la página (no bloquea nada),
-// así para cuando saquen la primera foto el permiso ya está resuelto.
-if(navigator.geolocation){
-  navigator.geolocation.getCurrentPosition(
-    ()=>{ /* permiso concedido, no hace falta hacer nada más acá */ },
-    ()=>{ /* el usuario todavía no decidió o lo denegó, no pasa nada, se reintenta al sacar la foto */ },
-    { enableHighAccuracy:true, timeout:8000 }
-  );
-}
+// Buscamos la ubicación apenas carga la página, así ya está lista para la primera foto.
+refrescarUbicacion();
 </script>
 
 </body>

@@ -130,6 +130,9 @@ function cargarJSONP(url){
 async function cargar(){
   const params = new URLSearchParams(location.search);
   const nombreParam = (params.get('nombre') || '').trim();
+  const direccionParam = (params.get('direccion') || '').trim();
+  const fechaInicioParam = (params.get('fechaInicio') || '').trim();
+  const telefonoParam = (params.get('telefono') || '').trim();
   const nombrePrincipal = nombreParam.split('|')[0].trim();
   const main = document.getElementById('main');
 
@@ -142,7 +145,11 @@ async function cargar(){
   document.getElementById('clienteNombre').textContent = nombrePrincipal;
 
   try{
-    const records = await cargarJSONP(BACKEND_URL + '?action=recordsFor&cliente=' + encodeURIComponent(nombreParam));
+    const url = BACKEND_URL + '?action=recordsFor&cliente=' + encodeURIComponent(nombreParam)
+      + '&direccion=' + encodeURIComponent(direccionParam)
+      + '&fechaInicio=' + encodeURIComponent(fechaInicioParam)
+      + '&telefono=' + encodeURIComponent(telefonoParam);
+    const records = await cargarJSONP(url);
     if(records && records.error) throw new Error(records.error);
 
     if(!records || records.length === 0){

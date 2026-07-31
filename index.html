@@ -275,6 +275,16 @@
       <span id="ubicacionStatusTexto" style="flex:1; color:#8A9793;">📍 Buscando tu ubicación...</span>
       <button type="button" id="refrescarUbicacionBtn" style="background:none; color:var(--teal); font-family:var(--body); font-weight:600; font-size:12.5px; padding:5px 10px; border:1px solid var(--line); border-radius:6px;">🔄 Actualizar</button>
     </div>
+    <div style="margin-bottom:12px;">
+      <label style="display:block; font-size:12.5px; font-weight:600; color:var(--teal-deep); margin-bottom:6px;">Resultado de la visita</label>
+      <select id="resultadoSelect" class="client-input" style="width:100%;">
+        <option value="Se limpió y se desagotó" selected>Se limpió y se desagotó</option>
+        <option value="Se limpió pero no se pudo desagotar">Se limpió pero no se pudo desagotar</option>
+        <option value="Cerrado">Cerrado</option>
+        <option value="Sin acceso">Sin acceso</option>
+        <option value="Cliente pidió reprogramar">Cliente pidió reprogramar</option>
+      </select>
+    </div>
     <input type="file" accept="image/*" capture="environment" id="photoInput" style="position:absolute; width:1px; height:1px; opacity:0; overflow:hidden;">
     <label class="btn-main" id="registerBtn" for="photoInput">📷 Foto del frente de la obra y registrar</label>
     <div class="status-line" id="statusLine"></div>
@@ -284,6 +294,15 @@
   <div class="card" style="padding:12px;">
     <button class="btn-small" id="exportBtn" style="width:100%; padding:12px;">⬇ Exportar historial a Excel</button>
     <button class="btn-small" id="refreshBtn" style="width:100%; padding:12px; margin-top:8px; background:var(--teal-deep);">↻ Actualizar historial</button>
+    <details style="margin-top:10px; font-size:12.5px; color:#8A9793;">
+      <summary style="cursor:pointer; font-weight:600;">✏️ Corregí un nombre o dirección mal escrito (actualiza el historial viejo también)</summary>
+      <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
+        <input class="client-input" id="renombrarViejoInput" placeholder="Nombre tal cual está ahora en el historial" style="font-size:13px;">
+        <input class="client-input" id="renombrarNuevoInput" placeholder="Nombre corregido" style="font-size:13px;">
+        <input class="client-input" id="renombrarDireccionInput" placeholder="Dirección corregida (opcional)" style="font-size:13px;">
+        <button class="btn-small" id="renombrarHistorialBtn" style="width:100%; padding:10px;">Aplicar corrección a todo el historial</button>
+      </div>
+    </details>
   </div>
   <div id="historyList"></div>
 
@@ -307,6 +326,7 @@ let clients = [];
 let records = [];
 let config = { companyName: 'Sani3' };
 let ubicacionActual = null;      // {lat, lon} de la última vez que se consiguió bien
+let obsFotosTemp = {};           // fotos de observación ya procesadas, esperando a que se guarden
 let ubicacionActualHora = null;  // Date de cuándo se consiguió
 
 const CLIENTES_PRECARGADOS = []; // ya no se usa: los clientes se leen en vivo desde Registro Alquileres
@@ -536,17 +556,26 @@ function crearFilaCliente(c, i){
   btnLink.textContent = 'Copiar link';
   btnLink.style.cssText = 'background:none; color:#B5711A; font-family:var(--body); font-weight:600; font-size:13px; padding:2px;';
   btnLink.onclick = async ()=>{
-    const anteriores = prompt(
-      '¿Este cliente tuvo algún nombre anterior en tu planilla (por ejemplo, si le corregiste el nombre)?\n\nSi tuvo, escribilo acá (si fueron varios, separalos con coma). Si no tuvo, dejá vacío y tocá Aceptar.',
-      ''
-    );
-    if(anteriores === null) return; // canceló
-
-    const nombres = [c.nombre].concat(
-      anteriores.split(',').map(n=>n.trim()).filter(Boolean)
-    );
     const url = new URL('cliente.html', location.href);
+    const tieneHuellaEstable = c.fechaInicio && c.telefono;
+
+    let nombres = [c.nombre];
+    if(!tieneHuellaEstable){
+      // Sin fecha de inicio + teléfono no hay forma confiable de vincular solo,
+      // así que preguntamos por nombres anteriores como respaldo.
+      const anteriores = prompt(
+        '¿Este cliente tuvo algún nombre anterior en tu planilla (por ejemplo, si le corregiste el nombre)?\n\nSi tuvo, escribilo acá (si fueron varios, separalos con coma). Si no tuvo, dejá vacío y tocá Aceptar.',
+        ''
+      );
+      if(anteriores === null) return; // canceló
+      nombres = nombres.concat(anteriores.split(',').map(n=>n.trim()).filter(Boolean));
+    }
+
     url.searchParams.set('nombre', nombres.join('|'));
+    if(c.direccion) url.searchParams.set('direccion', c.direccion);
+    if(c.fechaInicio) url.searchParams.set('fechaInicio', c.fechaInicio);
+    if(c.telefono) url.searchParams.set('telefono', c.telefono);
+
     try{
       await navigator.clipboard.writeText(url.toString());
       setStatus('Link de ' + c.nombre + ' copiado. Pegalo en WhatsApp para mandárselo.', 'ok');
@@ -777,11 +806,14 @@ document.getElementById('photoInput').addEventListener('change', async (e)=>{
 
     setStatus('Subiendo foto y guardando el registro...');
     const id = 'r' + now.getTime() + Math.random().toString(36).slice(2,6);
+    const resultado = document.getElementById('resultadoSelect').value;
     const resp = await backendPost({
       action: 'addRecord',
       id, cliente: clientObj.nombre, direccion: clientObj.direccion || '',
       fechaISO: now.toISOString(), lat, lon, ubicacionManual: '',
-      fotoBase64: dataUrl
+      fotoBase64: dataUrl,
+      fechaInicioCliente: clientObj.fechaInicio || '', telefonoCliente: clientObj.telefono || '',
+      resultado
     });
 
     const record = {
@@ -792,7 +824,10 @@ document.getElementById('photoInput').addEventListener('change', async (e)=>{
       fechaISO: now.toISOString(),
       foto: resp.fotoUrl || dataUrl,
       lat, lon,
-      ubicacionManual: ''
+      ubicacionManual: '',
+      resultado,
+      observacion: '',
+      fotoObservacion: ''
     };
     records.unshift(record);
     renderHistory();
@@ -904,6 +939,31 @@ async function exportToExcel(){
 }
 document.getElementById('exportBtn').onclick = exportToExcel;
 
+document.getElementById('renombrarHistorialBtn').onclick = async ()=>{
+  const viejo = document.getElementById('renombrarViejoInput').value.trim();
+  const nuevo = document.getElementById('renombrarNuevoInput').value.trim();
+  const direccionNueva = document.getElementById('renombrarDireccionInput').value.trim();
+
+  if(!viejo || !nuevo){
+    setStatus('Completá el nombre actual y el nombre corregido.', 'err');
+    return;
+  }
+  const ok = confirm(`¿Seguro que querés cambiar "${viejo}" por "${nuevo}" en TODO el historial? Esto actualiza todos los servicios ya registrados con ese nombre. No se puede deshacer solo.`);
+  if(!ok) return;
+
+  try{
+    const resp = await backendPost({ action:'renombrarEnHistorial', nombreViejo: viejo, nombreNuevo: nuevo, direccionNueva });
+    if(resp.error) throw new Error(resp.error);
+    setStatus(`Listo: se actualizaron ${resp.actualizados} servicio(s) de "${viejo}" a "${nuevo}".`, 'ok');
+    document.getElementById('renombrarViejoInput').value = '';
+    document.getElementById('renombrarNuevoInput').value = '';
+    document.getElementById('renombrarDireccionInput').value = '';
+    await loadAll();
+  }catch(err){
+    setStatus('No se pudo corregir: ' + err.message, 'err');
+  }
+};
+
 function formatTime(d){
   return d.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
 }
@@ -944,16 +1004,51 @@ function renderHistory(){
         </div>`;
     }
 
+    const coloresResultado = {
+      'Se limpió y se desagotó': 'var(--green)',
+      'Se limpió pero no se pudo desagotar': 'var(--amber)',
+      'Cerrado': '#B4432B',
+      'Sin acceso': '#B4432B',
+      'Cliente pidió reprogramar': '#8A6D3B'
+    };
+    const resultadoTexto = rec.resultado || 'Se limpió y se desagotó'; // registros viejos sin este dato
+    const colorResultado = coloresResultado[resultadoTexto] || '#8A9793';
+    const resultadoBadge = `<div style="display:inline-block; font-size:11.5px; font-weight:700; color:#fff; background:${colorResultado}; padding:3px 9px; border-radius:20px; margin-top:6px;">${escapeHtml(resultadoTexto)}</div>`;
+
+    let observacionBlock;
+    if(rec.observacion || rec.fotoObservacion){
+      observacionBlock = `
+        <div style="margin-top:10px; padding:10px; background:#FBF3E9; border-radius:8px; border:1px solid #EEDCC0;">
+          <div style="font-weight:700; font-size:12px; color:#8A6D3B; margin-bottom:4px;">⚠ Observación</div>
+          ${rec.observacion ? `<div style="font-size:12.5px; color:#4A5854;">${escapeHtml(rec.observacion)}</div>` : ''}
+          ${rec.fotoObservacion ? `<img class="ticket-photo-obs" src="${rec.fotoObservacion}" style="width:100%; border-radius:6px; margin-top:8px; cursor:pointer;">` : ''}
+        </div>`;
+    } else {
+      observacionBlock = `
+        <details style="margin-top:10px; font-size:12px; color:#8A9793;">
+          <summary style="cursor:pointer; color:var(--teal); font-weight:600;">➕ Agregar observación (algo roto o llamativo)</summary>
+          <div style="margin-top:8px; display:flex; flex-direction:column; gap:6px;">
+            <textarea class="obs-texto-input" data-id="${rec.id}" placeholder="¿Qué pasó? (ej: el asiento está roto)" style="width:100%; box-sizing:border-box; font-family:var(--body); font-size:12.5px; padding:8px; border:1px solid var(--line); border-radius:6px; resize:vertical; min-height:50px;"></textarea>
+            <input type="file" accept="image/*" capture="environment" class="obs-foto-input" data-id="${rec.id}" style="position:absolute; width:1px; height:1px; opacity:0; overflow:hidden;">
+            <label class="obs-foto-label" data-id="${rec.id}" style="text-align:center; padding:8px; border:1px dashed var(--line); border-radius:6px; color:var(--teal); font-weight:600; cursor:pointer;">📷 Sacar foto (opcional)</label>
+            <span class="obs-foto-nombre" data-id="${rec.id}" style="font-size:11px; color:#8A9793;"></span>
+            <button class="btn-guardar-obs" data-id="${rec.id}" style="padding:9px; background:var(--teal); color:#fff; border-radius:6px; font-weight:700;">Guardar observación</button>
+          </div>
+        </details>`;
+    }
+
     div.innerHTML = `
       <div class="ticket-top">
         <div class="ticket-client">${escapeHtml(rec.cliente)}</div>
         <div class="ticket-code">${rec.id.toUpperCase()}</div>
       </div>
       <div class="ticket-time">${formatDateTime(rec.fechaISO)}</div>
+      ${resultadoBadge}
       <div class="ticket-body">
         <img class="ticket-photo" src="${rec.foto}">
         <div class="ticket-info">${direccionLine}${ubicacionBlock}</div>
       </div>
+      ${observacionBlock}
       <div class="ticket-actions">
         <button class="btn-wa" data-id="${rec.id}">Enviar por WhatsApp</button>
         <button class="btn-del" data-id="${rec.id}">Eliminar</button>
@@ -962,7 +1057,7 @@ function renderHistory(){
     wrap.appendChild(div);
   });
 
-  wrap.querySelectorAll('.ticket-photo').forEach(img=>{
+  wrap.querySelectorAll('.ticket-photo, .ticket-photo-obs').forEach(img=>{
     img.onclick = ()=>{
       document.getElementById('lightboxImg').src = img.src;
       document.getElementById('lightbox').classList.add('open');
@@ -1029,6 +1124,63 @@ function renderHistory(){
         setStatus('Ubicación guardada a mano para ' + rec.cliente, 'ok');
       }catch(err){
         setStatus('No se pudo guardar la ubicación: ' + err.message, 'err');
+      }
+    };
+  });
+
+  // --- Observación con foto opcional ---
+  wrap.querySelectorAll('.obs-foto-label').forEach(label=>{
+    label.onclick = ()=>{
+      const id = label.dataset.id;
+      wrap.querySelector(`.obs-foto-input[data-id="${id}"]`).click();
+    };
+  });
+  wrap.querySelectorAll('.obs-foto-input').forEach(input=>{
+    input.onchange = async ()=>{
+      const id = input.dataset.id;
+      const file = input.files[0];
+      const nombreSpan = wrap.querySelector(`.obs-foto-nombre[data-id="${id}"]`);
+      if(!file){ return; }
+      nombreSpan.textContent = 'Procesando foto...';
+      try{
+        const dataUrl = await resizeImage(file, 1280, 0.82, []);
+        obsFotosTemp[id] = dataUrl;
+        nombreSpan.textContent = '✓ Foto lista para guardar';
+        nombreSpan.style.color = 'var(--green)';
+      }catch(err){
+        nombreSpan.textContent = 'No se pudo procesar la foto';
+      }
+    };
+  });
+  wrap.querySelectorAll('.btn-guardar-obs').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const id = btn.dataset.id;
+      const rec = records.find(r=>r.id===id);
+      if(!rec) return;
+      const textarea = wrap.querySelector(`.obs-texto-input[data-id="${id}"]`);
+      const observacion = textarea ? textarea.value.trim() : '';
+      const fotoObservacionBase64 = obsFotosTemp[id] || '';
+
+      if(!observacion && !fotoObservacionBase64){
+        setStatus('Escribí algo o sacá una foto antes de guardar la observación.', 'err');
+        return;
+      }
+
+      const textoOriginal = btn.textContent;
+      btn.textContent = 'Guardando...';
+      btn.disabled = true;
+      try{
+        const resp = await backendPost({ action:'agregarObservacion', id, observacion, fotoObservacionBase64 });
+        if(resp.error) throw new Error(resp.error);
+        rec.observacion = observacion;
+        rec.fotoObservacion = resp.fotoObservacionUrl || rec.fotoObservacion;
+        delete obsFotosTemp[id];
+        renderHistory();
+        setStatus('Observación guardada para ' + rec.cliente, 'ok');
+      }catch(err){
+        setStatus('No se pudo guardar la observación: ' + err.message, 'err');
+        btn.textContent = textoOriginal;
+        btn.disabled = false;
       }
     };
   });

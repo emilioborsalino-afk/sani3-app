@@ -195,7 +195,7 @@
     width:78px; height:78px; border-radius:6px; object-fit:cover;
     border:1px solid var(--line); flex-shrink:0; cursor:pointer;
   }
-  .ticket-info{font-size:13px; color:#4A5854; line-height:1.5; flex:1;}
+  .ticket-info{font-size:13px; color:#4A5854; line-height:1.5; flex:1; min-width:0;}
   .ticket-info a{color:var(--teal); text-decoration:none; font-weight:600;}
   .ticket-actions{
     display:flex; gap:8px; margin-top:12px;
@@ -619,12 +619,31 @@ document.getElementById('toggleClientListBtn').onclick = ()=>{
   btn.textContent = visible ? 'Ver lista completa de clientes' : 'Ocultar lista de clientes';
 };
 
-document.getElementById('buscarMapsNuevoClienteBtn').onclick = ()=>{
-  const nombre = document.getElementById('newClientInput').value.trim();
-  const addr = document.getElementById('newClientAddrInput').value.trim();
-  const query = [nombre, addr].filter(Boolean).join(' ');
-  const url = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(query || 'Río Tercero');
-  window.open(url, '_blank');
+function abrirMapsEnMiUbicacion(botonEstado){
+  if(botonEstado) botonEstado.textContent = 'Ubicando...';
+  const restaurar = (texto)=>{ if(botonEstado) botonEstado.textContent = texto; };
+  if(!navigator.geolocation){
+    window.open('https://www.google.com/maps', '_blank');
+    restaurar('📍 Abrir Google Maps');
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (pos)=>{
+      const { latitude, longitude } = pos.coords;
+      window.open(`https://www.google.com/maps/@${latitude},${longitude},18z`, '_blank');
+      restaurar('📍 Abrir Google Maps');
+    },
+    ()=>{
+      // si no consigue el permiso, igual abrimos Maps (sin centrar) para que busque a mano
+      window.open('https://www.google.com/maps', '_blank');
+      restaurar('📍 Abrir Google Maps');
+    },
+    { enableHighAccuracy:true, timeout:8000 }
+  );
+}
+
+document.getElementById('buscarMapsNuevoClienteBtn').onclick = (e)=>{
+  abrirMapsEnMiUbicacion(e.currentTarget);
 };
 
 document.getElementById('addClientBtn').onclick = async ()=>{
@@ -856,12 +875,13 @@ function renderHistory(){
     } else if(rec.ubicacionManual){
       ubicacionBlock = `<a href="${escapeHtml(rec.ubicacionManual)}" target="_blank">Ver ubicación (pegada a mano)</a> <button class="btn-manual-loc" data-id="${rec.id}" style="margin-left:6px; font-size:11px; padding:3px 8px; background:none; border:1px solid var(--line); color:var(--teal); border-radius:6px;">Editar</button>`;
     } else {
-      const busqueda = encodeURIComponent([rec.cliente, rec.direccion].filter(Boolean).join(' '));
       ubicacionBlock = `Sin ubicación
-        <div style="display:flex; gap:6px; margin-top:6px;">
-          <button class="btn-buscar-maps" data-busqueda="${busqueda}" style="font-size:12px; padding:6px 8px; background:none; border:1px dashed var(--line); color:var(--teal); border-radius:6px; white-space:nowrap;">📍 Abrir Maps</button>
-          <input class="manual-loc-input" data-id="${rec.id}" placeholder="Pegá acá el link" style="flex:1; font-size:12px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;">
-          <button class="btn-manual-loc" data-id="${rec.id}" style="font-size:12px; padding:6px 10px; background:var(--teal); color:#fff; border-radius:6px;">Guardar</button>
+        <div style="margin-top:6px;">
+          <button class="btn-buscar-maps" style="width:100%; box-sizing:border-box; font-size:12px; padding:7px 8px; background:none; border:1px dashed var(--line); color:var(--teal); border-radius:6px;">📍 Abrir Maps</button>
+          <div style="display:flex; gap:6px; margin-top:6px; width:100%;">
+            <input class="manual-loc-input" data-id="${rec.id}" placeholder="Pegá acá el link" style="flex:1; min-width:0; box-sizing:border-box; font-size:12px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;">
+            <button class="btn-manual-loc" data-id="${rec.id}" style="flex-shrink:0; font-size:12px; padding:6px 10px; background:var(--teal); color:#fff; border-radius:6px;">Guardar</button>
+          </div>
         </div>`;
     }
 
@@ -907,10 +927,7 @@ function renderHistory(){
     };
   });
   wrap.querySelectorAll('.btn-buscar-maps').forEach(btn=>{
-    btn.onclick = ()=>{
-      const url = 'https://www.google.com/maps/search/?api=1&query=' + btn.dataset.busqueda;
-      window.open(url, '_blank');
-    };
+    btn.onclick = (e)=>{ abrirMapsEnMiUbicacion(e.currentTarget); };
   });
   wrap.querySelectorAll('.btn-manual-loc').forEach(btn=>{
     btn.onclick = async ()=>{

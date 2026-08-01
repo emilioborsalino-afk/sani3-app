@@ -93,6 +93,20 @@ async function init(){
   }
   linkBox.textContent = '📍 ' + link;
 
+  main.innerHTML = `
+    <div class="card" style="cursor:default;">
+      <div style="font-family:var(--disp); font-weight:700; font-size:15px; color:var(--teal-deep); margin-bottom:10px;">¿A qué corresponde esta ubicación?</div>
+      <button id="btnModoServicio" style="width:100%; padding:12px; background:var(--teal); color:#fff; border-radius:8px; font-weight:700; margin-bottom:8px;">Un servicio sin ubicación (de hoy)</button>
+      <button id="btnModoFija" style="width:100%; padding:12px; background:var(--green); color:#fff; border-radius:8px; font-weight:700;">La ubicación fija de un baño (columna T)</button>
+    </div>
+  `;
+  document.getElementById('btnModoServicio').onclick = ()=> mostrarServiciosPendientes(link);
+  document.getElementById('btnModoFija').onclick = ()=> mostrarClientesSinUbicacionFija(link);
+}
+
+async function mostrarServiciosPendientes(link){
+  const main = document.getElementById('main');
+  main.innerHTML = '<div class="msg">Cargando servicios pendientes de ubicación...</div>';
   try{
     const records = await cargarJSONP(BACKEND_URL + '?action=recordsSinUbicacion');
     if(records && records.error) throw new Error(records.error);
@@ -117,6 +131,44 @@ async function init(){
           const resp = await cargarJSONP(BACKEND_URL + '?action=setUbicacionManualGet&id=' + encodeURIComponent(rec.id) + '&link=' + encodeURIComponent(link));
           if(resp && resp.error) throw new Error(resp.error);
           main.innerHTML = `<div class="msg ok">✓ Ubicación guardada para ${escapeHtml(rec.cliente)}.<br>Ya podés cerrar esta pestaña.</div>`;
+        }catch(err){
+          main.innerHTML = '<div class="msg err">No se pudo guardar: ' + escapeHtml(err.message) + '</div>';
+        }
+      };
+      main.appendChild(btn);
+    });
+  }catch(err){
+    main.innerHTML = '<div class="msg err">No se pudo cargar la lista: ' + escapeHtml(err.message) + '</div>';
+  }
+}
+
+async function mostrarClientesSinUbicacionFija(link){
+  const main = document.getElementById('main');
+  main.innerHTML = '<div class="msg">Cargando clientes sin ubicación fija...</div>';
+  try{
+    const clientes = await cargarJSONP(BACKEND_URL + '?action=clientesSinUbicacionFija');
+    if(clientes && clientes.error) throw new Error(clientes.error);
+
+    if(!clientes || clientes.length === 0){
+      main.innerHTML = '<div class="msg">No hay clientes pendientes de ubicación fija — ya la tienen todos cargada, o revisá la columna T.</div>';
+      return;
+    }
+
+    main.innerHTML = '';
+    clientes.forEach(c=>{
+      const btn = document.createElement('button');
+      btn.className = 'card';
+      btn.innerHTML = `
+        <div class="cliente">${escapeHtml(c.nombre)}</div>
+        ${c.direccion ? `<div class="detalle">${escapeHtml(c.direccion)}</div>` : ''}
+        ${c.dia ? `<div class="fecha">${escapeHtml(c.dia)}</div>` : ''}
+      `;
+      btn.onclick = async ()=>{
+        main.innerHTML = '<div class="msg">Guardando...</div>';
+        try{
+          const resp = await cargarJSONP(BACKEND_URL + '?action=guardarUbicacionFijaGet&fila=' + encodeURIComponent(c.fila) + '&link=' + encodeURIComponent(link));
+          if(resp && resp.error) throw new Error(resp.error);
+          main.innerHTML = `<div class="msg ok">✓ Ubicación fija guardada para ${escapeHtml(c.nombre)} (columna T).<br>Ya podés cerrar esta pestaña.</div>`;
         }catch(err){
           main.innerHTML = '<div class="msg err">No se pudo guardar: ' + escapeHtml(err.message) + '</div>';
         }

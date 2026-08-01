@@ -443,6 +443,22 @@ function diasDeCliente(c){
   return encontrados.length ? encontrados : ['Otros'];
 }
 
+function inicioSemanaActual(){
+  // Lunes 00:00 de esta semana
+  const hoy = new Date();
+  const diaSemana = hoy.getDay(); // 0=domingo, 1=lunes, ...
+  const diasDesdeElLunes = diaSemana === 0 ? 6 : diaSemana - 1;
+  const lunes = new Date(hoy);
+  lunes.setDate(hoy.getDate() - diasDesdeElLunes);
+  lunes.setHours(0,0,0,0);
+  return lunes;
+}
+
+function hechoEstaSemana(nombreCliente){
+  const inicio = inicioSemanaActual();
+  return records.some(r => r.cliente === nombreCliente && new Date(r.fechaISO) >= inicio);
+}
+
 let selectedClientIndex = null;
 
 function updateSelectedLabel(){
@@ -503,14 +519,18 @@ function renderClientSelect(){
 
     grupos[d].forEach(i=>{
       const c = clients[i];
-      const item = document.createElement('button');
-      item.type = 'button';
+      const item = document.createElement('div');
       item.dataset.idx = i;
-      item.style.cssText = 'width:100%; text-align:left; padding:12px 14px; border:none; border-top:1px solid var(--line); background:' + (selectedClientIndex===i ? '#E3ECEA' : '#fff') + '; font-family:var(--body); font-size:14.5px; color:var(--ink); cursor:pointer;';
-      item.innerHTML = c.direccion
+      item.style.cssText = 'display:flex; align-items:stretch; border-top:1px solid var(--line); background:' + (selectedClientIndex===i ? '#E3ECEA' : '#fff') + ';';
+
+      const btnInfo = document.createElement('button');
+      btnInfo.type = 'button';
+      btnInfo.style.cssText = 'flex:1; text-align:left; padding:12px 14px; border:none; background:none; font-family:var(--body); font-size:14.5px; color:var(--ink); cursor:pointer;';
+      const check = hechoEstaSemana(c.nombre) ? ' <span style="color:var(--green); font-weight:700;">✓ hecho esta semana</span>' : '';
+      btnInfo.innerHTML = (c.direccion
         ? `<strong>${escapeHtml(c.nombre)}</strong><br><span style="color:#8A9793; font-size:12.5px;">${escapeHtml(c.direccion)}</span>`
-        : `<strong>${escapeHtml(c.nombre)}</strong>`;
-      item.onclick = ()=>{
+        : `<strong>${escapeHtml(c.nombre)}</strong>`) + check;
+      btnInfo.onclick = ()=>{
         selectedClientIndex = i;
         updateSelectedLabel();
         wrap.querySelectorAll('[data-idx]').forEach(el=> el.style.background = '#fff');
@@ -521,6 +541,21 @@ function renderClientSelect(){
         wrap.querySelectorAll('.acc-body').forEach(b=>b.style.display='none');
         wrap.querySelectorAll('.acc-arrow').forEach(a=>a.textContent='▾');
       };
+      item.appendChild(btnInfo);
+
+      if(c.ubicacionFija){
+        const btnMapa = document.createElement('button');
+        btnMapa.type = 'button';
+        btnMapa.title = 'Ir a la ubicación de este baño';
+        btnMapa.textContent = '📍';
+        btnMapa.style.cssText = 'flex-shrink:0; width:46px; border:none; border-left:1px solid var(--line); background:none; font-size:18px; cursor:pointer;';
+        btnMapa.onclick = (e)=>{
+          e.stopPropagation();
+          window.open(c.ubicacionFija, '_blank');
+        };
+        item.appendChild(btnMapa);
+      }
+
       body.appendChild(item);
     });
 

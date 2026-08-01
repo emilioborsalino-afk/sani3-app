@@ -554,13 +554,13 @@ function renderClientSelect(){
           window.open(c.ubicacionFija, '_blank');
         };
       } else {
-        btnMapa.title = 'Todavía no tiene ubicación fija cargada';
+        btnMapa.title = 'Todavía no tiene ubicación fija cargada — tocá para abrir Maps y buscarla';
         btnMapa.style.opacity = '0.4';
         btnMapa.textContent = '📍';
         btnMapa.onclick = (e)=>{
           e.stopPropagation();
-          const abrir = confirm(`"${c.nombre}" todavía no tiene ubicación fija cargada (columna T de tu planilla).\n\n¿Querés abrir Google Maps ahora para buscarla? Después la podés compartir desde ahí (Compartir → Sani3 → "La ubicación fija de un baño") para que quede guardada.`);
-          if(abrir) window.open('https://www.google.com/maps', '_blank');
+          window.open('https://www.google.com/maps', '_blank');
+          setStatus(`"${c.nombre}" todavía no tenía ubicación fija — te abrí Maps para que la busques. Después compartila desde ahí (Compartir → Sani3 → "La ubicación fija de un baño") para que quede guardada.`, 'ok');
         };
       }
       item.appendChild(btnMapa);

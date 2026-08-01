@@ -543,18 +543,27 @@ function renderClientSelect(){
       };
       item.appendChild(btnInfo);
 
+      const btnMapa = document.createElement('button');
+      btnMapa.type = 'button';
+      btnMapa.style.cssText = 'flex-shrink:0; width:46px; border:none; border-left:1px solid var(--line); background:none; font-size:18px; cursor:pointer;';
       if(c.ubicacionFija){
-        const btnMapa = document.createElement('button');
-        btnMapa.type = 'button';
         btnMapa.title = 'Ir a la ubicación de este baño';
         btnMapa.textContent = '📍';
-        btnMapa.style.cssText = 'flex-shrink:0; width:46px; border:none; border-left:1px solid var(--line); background:none; font-size:18px; cursor:pointer;';
         btnMapa.onclick = (e)=>{
           e.stopPropagation();
           window.open(c.ubicacionFija, '_blank');
         };
-        item.appendChild(btnMapa);
+      } else {
+        btnMapa.title = 'Todavía no tiene ubicación fija cargada';
+        btnMapa.style.opacity = '0.4';
+        btnMapa.textContent = '📍';
+        btnMapa.onclick = (e)=>{
+          e.stopPropagation();
+          const abrir = confirm(`"${c.nombre}" todavía no tiene ubicación fija cargada (columna T de tu planilla).\n\n¿Querés abrir Google Maps ahora para buscarla? Después la podés compartir desde ahí (Compartir → Sani3 → "La ubicación fija de un baño") para que quede guardada.`);
+          if(abrir) window.open('https://www.google.com/maps', '_blank');
+        };
       }
+      item.appendChild(btnMapa);
 
       body.appendChild(item);
     });

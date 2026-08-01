@@ -87,12 +87,36 @@ async function init(){
   const main = document.getElementById('main');
 
   if(!link){
+    // En computadora no existe el "compartir a una app" como en el celular,
+    // así que dejamos pegar el link a mano acá.
     linkBox.style.display = 'none';
-    main.innerHTML = '<div class="msg err">No detecté ningún link de ubicación. Volvé a Google Maps, tocá Compartir, y elegí esta app de nuevo.</div>';
+    main.innerHTML = `
+      <div class="card" style="cursor:default;">
+        <div style="font-family:var(--disp); font-weight:700; font-size:15px; color:var(--teal-deep); margin-bottom:10px;">Pegá el link de Google Maps</div>
+        <div style="font-size:12.5px; color:#8A9793; margin-bottom:10px;">En el celular esto se hace tocando "Compartir → Sani3" desde Maps. En la computadora, copiá el link de Maps y pegalo acá:</div>
+        <input id="linkManualInput" type="text" placeholder="https://maps.app.goo.gl/..." style="width:100%; box-sizing:border-box; padding:10px; border:1px solid var(--line); border-radius:8px; font-family:var(--mono); font-size:13px; margin-bottom:10px;">
+        <button id="btnContinuarManual" style="width:100%; padding:12px; background:var(--teal); color:#fff; border-radius:8px; font-weight:700;">Continuar</button>
+      </div>
+    `;
+    document.getElementById('btnContinuarManual').onclick = ()=>{
+      const valor = document.getElementById('linkManualInput').value.trim();
+      const linkManual = extraerLink(valor) || valor;
+      if(!linkManual){
+        main.insertAdjacentHTML('beforeend', '<div class="msg err">Pegá un link válido de Google Maps.</div>');
+        return;
+      }
+      linkBox.style.display = 'block';
+      linkBox.textContent = '📍 ' + linkManual;
+      mostrarOpcionesModo(linkManual);
+    };
     return;
   }
   linkBox.textContent = '📍 ' + link;
+  mostrarOpcionesModo(link);
+}
 
+function mostrarOpcionesModo(link){
+  const main = document.getElementById('main');
   main.innerHTML = `
     <div class="card" style="cursor:default;">
       <div style="font-family:var(--disp); font-weight:700; font-size:15px; color:var(--teal-deep); margin-bottom:10px;">¿A qué corresponde esta ubicación?</div>

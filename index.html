@@ -1259,6 +1259,16 @@ if('serviceWorker' in navigator){
 
 todayLabel();
 backendUrl = localStorage.getItem(BACKEND_URL_KEY) || '';
+
+// Si llegamos con ?backend=... (por ejemplo, volviendo desde "Compartir ubicación"),
+// lo usamos y lo guardamos, así no depende de que el celular comparta la memoria entre pantallas.
+const backendDesdeUrl = new URLSearchParams(location.search).get('backend');
+if(backendDesdeUrl){
+  backendUrl = backendDesdeUrl;
+  localStorage.setItem(BACKEND_URL_KEY, backendUrl);
+  history.replaceState(null, '', location.pathname); // limpiamos el ?backend=... de la barra de direcciones
+}
+
 document.getElementById('backendUrlInput').value = backendUrl;
 loadAll();
 

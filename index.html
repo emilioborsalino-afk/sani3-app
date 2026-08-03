@@ -435,9 +435,10 @@ function normalizar(s){
   return (s||'').toLowerCase()
     .replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u');
 }
+const PREFIJOS_DIA = { 'Lunes':'lun', 'Martes':'mar', 'Miercoles':'mie', 'Jueves':'jue', 'Viernes':'vie', 'Sabado':'sab' };
 function diasDeCliente(c){
   const dia = normalizar(c.dia);
-  const encontrados = DIAS_CANON.filter(d => dia.indexOf(normalizar(d)) !== -1);
+  const encontrados = DIAS_CANON.filter(d => dia.indexOf(PREFIJOS_DIA[d]) !== -1);
   return encontrados.length ? encontrados : ['Otros'];
 }
 

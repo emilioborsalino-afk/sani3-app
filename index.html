@@ -1054,9 +1054,11 @@ function renderHistory(){
       'Sin acceso': '#B4432B',
       'Cliente pidió reprogramar': '#8A6D3B'
     };
+    const opcionesResultado = ['Se limpió y se desagotó', 'Se limpió pero no se pudo desagotar', 'Cerrado', 'Sin acceso', 'Cliente pidió reprogramar'];
     const resultadoTexto = rec.resultado || 'Se limpió y se desagotó'; // registros viejos sin este dato
     const colorResultado = coloresResultado[resultadoTexto] || '#8A9793';
-    const resultadoBadge = `<div style="display:inline-block; font-size:11.5px; font-weight:700; color:#fff; background:${colorResultado}; padding:3px 9px; border-radius:20px; margin-top:6px;">${escapeHtml(resultadoTexto)}</div>`;
+    const opcionesHtml = opcionesResultado.map(op => `<option value="${escapeHtml(op)}" ${op===resultadoTexto?'selected':''}>${escapeHtml(op)}</option>`).join('');
+    const resultadoBadge = `<select class="resultado-select" data-id="${rec.id}" title="Tocá para corregir el resultado" style="display:inline-block; font-size:11.5px; font-weight:700; color:#fff; background:${colorResultado}; padding:4px 22px 4px 9px; border-radius:20px; margin-top:6px; border:none; appearance:none; -webkit-appearance:none; font-family:var(--body); cursor:pointer;">${opcionesHtml}</select>`;
 
     let observacionBlock;
     if(rec.observacion || rec.fotoObservacion){
@@ -1192,6 +1194,25 @@ function renderHistory(){
         nombreSpan.style.color = 'var(--green)';
       }catch(err){
         nombreSpan.textContent = 'No se pudo procesar la foto';
+      }
+    };
+  });
+  wrap.querySelectorAll('.resultado-select').forEach(select=>{
+    select.onchange = async ()=>{
+      const id = select.dataset.id;
+      const rec = records.find(r=>r.id===id);
+      if(!rec) return;
+      const nuevoResultado = select.value;
+      select.disabled = true;
+      try{
+        const resp = await backendPost({ action:'actualizarResultado', id, resultado: nuevoResultado });
+        if(resp.error) throw new Error(resp.error);
+        rec.resultado = nuevoResultado;
+        renderHistory();
+        setStatus('Resultado corregido para ' + rec.cliente, 'ok');
+      }catch(err){
+        setStatus('No se pudo corregir: ' + err.message, 'err');
+        select.disabled = false;
       }
     };
   });

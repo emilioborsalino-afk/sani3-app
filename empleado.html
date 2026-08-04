@@ -253,18 +253,18 @@
   <div class="card">
     <div id="selectedClientLabel" style="font-family:var(--disp); font-weight:700; font-size:15px; color:#8A9793; margin-bottom:10px;">Ningún cliente elegido todavía</div>
     <div id="clientAccordion"></div>
+    <div class="row" style="margin-top:14px;">
+      <input class="client-input" id="newClientInput" placeholder="Nombre (solo si no está en la lista)">
+    </div>
+    <div class="row">
+      <input class="client-input" id="newClientAddrInput" placeholder="Dirección / ubicación">
+      <button class="btn-small" id="addClientBtn">Agregar</button>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:8px;">
+      <button type="button" id="usarMiUbicacionNuevoClienteBtn" style="flex:1; background:var(--green); color:#fff; font-family:var(--body); font-weight:600; font-size:12.5px; padding:7px; border-radius:6px;">📍 Usar mi ubicación actual</button>
+      <button type="button" id="buscarMapsNuevoClienteBtn" style="flex:1; background:var(--teal); color:#fff; font-family:var(--body); font-weight:600; font-size:12.5px; padding:7px; border-radius:6px;">🗺️ Abrir Maps</button>
+    </div>
     <div class="solo-dueno">
-      <div class="row" style="margin-top:14px;">
-        <input class="client-input" id="newClientInput" placeholder="Nombre (solo si no está en la lista)">
-      </div>
-      <div class="row">
-        <input class="client-input" id="newClientAddrInput" placeholder="Dirección / ubicación">
-        <button class="btn-small" id="addClientBtn">Agregar</button>
-      </div>
-      <div style="display:flex; gap:8px; margin-top:8px;">
-        <button type="button" id="usarMiUbicacionNuevoClienteBtn" style="flex:1; background:var(--green); color:#fff; font-family:var(--body); font-weight:600; font-size:12.5px; padding:7px; border-radius:6px;">📍 Usar mi ubicación actual</button>
-        <button type="button" id="buscarMapsNuevoClienteBtn" style="flex:1; background:var(--teal); color:#fff; font-family:var(--body); font-weight:600; font-size:12.5px; padding:7px; border-radius:6px;">🗺️ Abrir Maps</button>
-      </div>
       <button id="toggleClientListBtn" style="width:100%; margin-top:10px; background:none; color:var(--teal); font-family:var(--body); font-weight:600; font-size:13px; padding:8px;">Ver lista completa de clientes</button>
       <div id="clientList" style="display:none;"></div>
     </div>

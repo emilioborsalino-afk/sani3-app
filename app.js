@@ -420,6 +420,8 @@ document.getElementById('buscarMapsNuevoClienteBtn').onclick = (e)=>{
   abrirMapsEnMiUbicacion(e.currentTarget);
 };
 
+let nuevaUbicacionFija = '';
+
 document.getElementById('usarMiUbicacionNuevoClienteBtn').onclick = async (e)=>{
   const btn = e.currentTarget;
   const textoOriginal = btn.textContent;
@@ -427,13 +429,13 @@ document.getElementById('usarMiUbicacionNuevoClienteBtn').onclick = async (e)=>{
   btn.disabled = true;
   try{
     const pos = await getPosition();
-    const link = `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`;
-    document.getElementById('newClientAddrInput').value = link;
-    setStatus('Ubicación actual cargada en el campo de dirección.', 'ok');
+    nuevaUbicacionFija = `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`;
+    btn.textContent = '✓ Ubicación lista';
+    setStatus('Ubicación capturada — se va a guardar junto con el cliente al tocar Agregar.', 'ok');
   }catch(err){
     setStatus('No se pudo obtener la ubicación: ' + describeGeoError(err), 'err');
+    btn.textContent = textoOriginal;
   }
-  btn.textContent = textoOriginal;
   btn.disabled = false;
 };
 
@@ -447,10 +449,12 @@ document.getElementById('addClientBtn').onclick = async ()=>{
     return;
   }
   try{
-    await backendPost({ action:'addClient', nombre: name, direccion: addr });
-    clients.push({ nombre: name, direccion: addr });
+    await backendPost({ action:'addClient', nombre: name, direccion: addr, ubicacionFija: nuevaUbicacionFija });
+    clients.push({ nombre: name, direccion: addr, dia:'', telefono:'', fechaInicio:'', ubicacionFija: nuevaUbicacionFija });
     input.value = '';
     addrInput.value = '';
+    nuevaUbicacionFija = '';
+    document.getElementById('usarMiUbicacionNuevoClienteBtn').textContent = '📍 Usar mi ubicación actual';
     renderClientSelect();
     renderClientList();
     setStatus('Cliente agregado: ' + name, 'ok');

@@ -335,6 +335,7 @@ function crearFilaCliente(c, i){
 
 function renderClientList(){
   const wrap = document.getElementById('clientList');
+  if(!wrap) return; // esta lista no existe en la versión de empleado
   wrap.innerHTML = '';
 
   if(clients.length === 0){
@@ -385,13 +386,15 @@ function renderClientList(){
   });
 }
 
-document.getElementById('toggleClientListBtn').onclick = ()=>{
-  const listEl = document.getElementById('clientList');
-  const btn = document.getElementById('toggleClientListBtn');
-  const visible = listEl.style.display !== 'none';
-  listEl.style.display = visible ? 'none' : 'block';
-  btn.textContent = visible ? 'Ver lista completa de clientes' : 'Ocultar lista de clientes';
-};
+if(document.getElementById('toggleClientListBtn')){
+  document.getElementById('toggleClientListBtn').onclick = ()=>{
+    const listEl = document.getElementById('clientList');
+    const btn = document.getElementById('toggleClientListBtn');
+    const visible = listEl.style.display !== 'none';
+    listEl.style.display = visible ? 'none' : 'block';
+    btn.textContent = visible ? 'Ver lista completa de clientes' : 'Ocultar lista de clientes';
+  };
+}
 
 function abrirMapsEnMiUbicacion(botonEstado){
   if(botonEstado) botonEstado.textContent = 'Ubicando...';
@@ -416,52 +419,141 @@ function abrirMapsEnMiUbicacion(botonEstado){
   );
 }
 
-document.getElementById('buscarMapsNuevoClienteBtn').onclick = (e)=>{
-  abrirMapsEnMiUbicacion(e.currentTarget);
-};
-
 let nuevaUbicacionFija = '';
 
-document.getElementById('usarMiUbicacionNuevoClienteBtn').onclick = async (e)=>{
-  const btn = e.currentTarget;
-  const textoOriginal = btn.textContent;
-  btn.textContent = 'Ubicando...';
-  btn.disabled = true;
-  try{
-    const pos = await getPosition();
-    nuevaUbicacionFija = `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`;
-    btn.textContent = '✓ Ubicación lista';
-    setStatus('Ubicación capturada — se va a guardar junto con el cliente al tocar Agregar.', 'ok');
-  }catch(err){
-    setStatus('No se pudo obtener la ubicación: ' + describeGeoError(err), 'err');
-    btn.textContent = textoOriginal;
-  }
-  btn.disabled = false;
-};
+if(document.getElementById('buscarMapsNuevoClienteBtn')){
+  document.getElementById('buscarMapsNuevoClienteBtn').onclick = (e)=>{
+    abrirMapsEnMiUbicacion(e.currentTarget);
+  };
+}
 
-document.getElementById('addClientBtn').onclick = async ()=>{
-  const input = document.getElementById('newClientInput');
-  const addrInput = document.getElementById('newClientAddrInput');
-  const name = input.value.trim();
-  const addr = addrInput.value.trim();
-  if(!name){
-    setStatus('Escribí un nombre antes de tocar Agregar (esto es solo para clientes nuevos, los que ya existen se eligen arriba en el desplegable).', 'err');
-    return;
-  }
-  try{
-    await backendPost({ action:'addClient', nombre: name, direccion: addr, ubicacionFija: nuevaUbicacionFija });
-    clients.push({ nombre: name, direccion: addr, dia:'', telefono:'', fechaInicio:'', ubicacionFija: nuevaUbicacionFija });
-    input.value = '';
-    addrInput.value = '';
-    nuevaUbicacionFija = '';
-    document.getElementById('usarMiUbicacionNuevoClienteBtn').textContent = '📍 Usar mi ubicación actual';
-    renderClientSelect();
-    renderClientList();
-    setStatus('Cliente agregado: ' + name, 'ok');
-  }catch(err){
-    setStatus('No se pudo agregar: ' + err.message, 'err');
-  }
-};
+if(document.getElementById('usarMiUbicacionNuevoClienteBtn')){
+  document.getElementById('usarMiUbicacionNuevoClienteBtn').onclick = async (e)=>{
+    const btn = e.currentTarget;
+    const textoOriginal = btn.textContent;
+    btn.textContent = 'Ubicando...';
+    btn.disabled = true;
+    try{
+      const pos = await getPosition();
+      nuevaUbicacionFija = `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`;
+      btn.textContent = '✓ Ubicación lista';
+      setStatus('Ubicación capturada — se va a guardar junto con el cliente al tocar Agregar.', 'ok');
+    }catch(err){
+      setStatus('No se pudo obtener la ubicación: ' + describeGeoError(err), 'err');
+      btn.textContent = textoOriginal;
+    }
+    btn.disabled = false;
+  };
+}
+
+if(document.getElementById('addClientBtn')){
+  document.getElementById('addClientBtn').onclick = async ()=>{
+    const input = document.getElementById('newClientInput');
+    const addrInput = document.getElementById('newClientAddrInput');
+    const name = input.value.trim();
+    const addr = addrInput.value.trim();
+    if(!name){
+      setStatus('Escribí un nombre antes de tocar Agregar (esto es solo para clientes nuevos, los que ya existen se eligen arriba en el desplegable).', 'err');
+      return;
+    }
+    try{
+      await backendPost({ action:'addClient', nombre: name, direccion: addr, ubicacionFija: nuevaUbicacionFija });
+      clients.push({ nombre: name, direccion: addr, dia:'', telefono:'', fechaInicio:'', ubicacionFija: nuevaUbicacionFija });
+      input.value = '';
+      addrInput.value = '';
+      nuevaUbicacionFija = '';
+      document.getElementById('usarMiUbicacionNuevoClienteBtn').textContent = '📍 Usar mi ubicación actual';
+      renderClientSelect();
+      renderClientList();
+      setStatus('Cliente agregado: ' + name, 'ok');
+    }catch(err){
+      setStatus('No se pudo agregar: ' + err.message, 'err');
+    }
+  };
+}
+
+// --- Registro rápido para empleados: nombre + dirección + foto, sin pasar por la lista ---
+let ubicacionAdHoc = null;
+
+if(document.getElementById('empUsarUbicacionBtn')){
+  document.getElementById('empUsarUbicacionBtn').onclick = async (e)=>{
+    const btn = e.currentTarget;
+    const original = btn.textContent;
+    btn.textContent = 'Ubicando...';
+    btn.disabled = true;
+    try{
+      const pos = await getPosition();
+      ubicacionAdHoc = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      btn.textContent = '✓ Ubicación lista';
+    }catch(err){
+      setStatus('No se pudo obtener la ubicación: ' + describeGeoError(err), 'err');
+      btn.textContent = original;
+    }
+    btn.disabled = false;
+  };
+}
+
+if(document.getElementById('empFotoInput')){
+  document.getElementById('empFotoInput').addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const nombre = document.getElementById('empNombreInput').value.trim();
+    const direccion = document.getElementById('empDireccionInput').value.trim();
+    if(!nombre){
+      setStatus('Escribí el nombre del cliente antes de sacar la foto.', 'err');
+      e.target.value = '';
+      return;
+    }
+    setStatus('Procesando foto...');
+
+    let lat = null, lon = null, geoErrorReason = null;
+    const ubic = ubicacionAdHoc || ubicacionActual;
+    if(ubic){ lat = ubic.lat; lon = ubic.lon; }
+    else geoErrorReason = 'no se consiguió ubicación — tocá "Usar mi ubicación actual" antes de sacar la foto';
+
+    try{
+      const now = new Date();
+      const clientLabel = direccion ? `${nombre} — ${direccion}` : nombre;
+      const stampText = [
+        clientLabel,
+        now.toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'numeric'}) + '  ' + formatTime(now),
+        (lat != null) ? `${lat.toFixed(5)}, ${lon.toFixed(5)}` : 'Ubicación no disponible'
+      ];
+      const dataUrl = await resizeImage(file, 900, 0.7, stampText);
+
+      setStatus('Subiendo foto y guardando el registro...');
+      const id = 'r' + now.getTime() + Math.random().toString(36).slice(2,6);
+      const resultadoSelectEl = document.getElementById('resultadoSelect');
+      const resultado = resultadoSelectEl ? resultadoSelectEl.value : '';
+      const resp = await backendPost({
+        action: 'addRecord',
+        id, cliente: nombre, direccion,
+        fechaISO: now.toISOString(), lat, lon, ubicacionManual: '',
+        fotoBase64: dataUrl,
+        fechaInicioCliente: '', telefonoCliente: '',
+        resultado
+      });
+
+      const record = {
+        id, cliente: nombre, direccion, telefono:'',
+        fechaISO: now.toISOString(), foto: resp.fotoUrl || dataUrl,
+        lat, lon, ubicacionManual: '', resultado, observacion:'', fotoObservacion:''
+      };
+      records.unshift(record);
+      renderHistory();
+      const ubicOk = lat != null ? ' (con ubicación)' : ` (sin ubicación: ${geoErrorReason})`;
+      setStatus('Registrado: ' + nombre + ubicOk, lat != null ? 'ok' : 'err');
+
+      document.getElementById('empNombreInput').value = '';
+      document.getElementById('empDireccionInput').value = '';
+      ubicacionAdHoc = null;
+      document.getElementById('empUsarUbicacionBtn').textContent = '📍 Usar mi ubicación actual';
+    }catch(err){
+      setStatus('Error al guardar el registro: ' + err.message, 'err');
+    }
+    e.target.value = '';
+  });
+}
 
 function escapeHtml(s){
   return s.replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));

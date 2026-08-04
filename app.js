@@ -521,6 +521,17 @@ if(document.getElementById('empFotoInput')){
       ];
       const dataUrl = await resizeImage(file, 900, 0.7, stampText);
 
+      // Si es la primera vez que aparece este nombre+dirección, lo guardamos como cliente
+      // (queda en "Otros / agregados a mano"), así la próxima vez ya está en la lista.
+      const yaExiste = clients.some(c => c.nombre.trim().toLowerCase() === nombre.toLowerCase() && (c.direccion||'').trim().toLowerCase() === direccion.toLowerCase());
+      const ubicacionFijaNueva = ubic ? `https://maps.google.com/?q=${ubic.lat},${ubic.lon}` : '';
+      if(!yaExiste){
+        try{
+          await backendPost({ action:'addClient', nombre, direccion, ubicacionFija: ubicacionFijaNueva });
+          clients.push({ nombre, direccion, dia:'', telefono:'', fechaInicio:'', ubicacionFija: ubicacionFijaNueva });
+        }catch(errCliente){ /* si falla, seguimos igual con el registro del servicio */ }
+      }
+
       setStatus('Subiendo foto y guardando el registro...');
       const id = 'r' + now.getTime() + Math.random().toString(36).slice(2,6);
       const resultadoSelectEl = document.getElementById('resultadoSelect');
@@ -540,6 +551,7 @@ if(document.getElementById('empFotoInput')){
         lat, lon, ubicacionManual: '', resultado, observacion:'', fotoObservacion:''
       };
       records.unshift(record);
+      renderClientSelect();
       renderHistory();
       const ubicOk = lat != null ? ' (con ubicación)' : ` (sin ubicación: ${geoErrorReason})`;
       setStatus('Registrado: ' + nombre + ubicOk, lat != null ? 'ok' : 'err');

@@ -169,37 +169,57 @@ async function mostrarServiciosPendientes(link){
 
 async function mostrarClientesSinUbicacionFija(link){
   const main = document.getElementById('main');
-  main.innerHTML = '<div class="msg">Cargando clientes sin ubicación fija...</div>';
+  main.innerHTML = '<div class="msg">Cargando clientes...</div>';
   try{
     const clientes = await cargarJSONP(BACKEND_URL + '?action=clientesSinUbicacionFija');
     if(clientes && clientes.error) throw new Error(clientes.error);
 
     if(!clientes || clientes.length === 0){
-      main.innerHTML = '<div class="msg">No hay clientes pendientes de ubicación fija — ya la tienen todos cargada, o revisá la columna T.</div>';
+      main.innerHTML = '<div class="msg">No se encontraron clientes en tu planilla.</div>';
       return;
     }
 
-    main.innerHTML = '';
-    clientes.forEach(c=>{
-      const btn = document.createElement('button');
-      btn.className = 'card';
-      btn.innerHTML = `
-        <div class="cliente">${escapeHtml(c.nombre)}</div>
-        ${c.direccion ? `<div class="detalle">${escapeHtml(c.direccion)}</div>` : ''}
-        ${c.dia ? `<div class="fecha">${escapeHtml(c.dia)}</div>` : ''}
-      `;
-      btn.onclick = async ()=>{
-        main.innerHTML = '<div class="msg">Guardando...</div>';
-        try{
-          const resp = await cargarJSONP(BACKEND_URL + '?action=guardarUbicacionFijaGet&fila=' + encodeURIComponent(c.fila) + '&link=' + encodeURIComponent(link));
-          if(resp && resp.error) throw new Error(resp.error);
-          main.innerHTML = `<div class="msg ok">✓ Ubicación fija guardada para ${escapeHtml(c.nombre)} (columna T).<br><a href="./index.html?backend=${encodeURIComponent(BACKEND_URL)}" style="display:inline-block; margin-top:14px; padding:10px 18px; background:var(--teal); color:#fff; border-radius:8px; text-decoration:none; font-weight:700;">← Volver a la app</a></div>`;
-        }catch(err){
-          main.innerHTML = '<div class="msg err">No se pudo guardar: ' + escapeHtml(err.message) + '</div>';
-        }
-      };
-      main.appendChild(btn);
-    });
+    main.innerHTML = `
+      <input id="buscarClienteInput" type="text" placeholder="Buscar cliente..." style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:10px; border:1px solid var(--line); border-radius:8px; font-family:var(--body); font-size:14px;">
+      <div id="listaClientesFija"></div>
+    `;
+
+    function renderLista(filtro){
+      const cont = document.getElementById('listaClientesFija');
+      cont.innerHTML = '';
+      const filtroNorm = (filtro||'').trim().toLowerCase();
+      const filtrados = filtroNorm ? clientes.filter(c => c.nombre.toLowerCase().includes(filtroNorm)) : clientes;
+
+      if(filtrados.length === 0){
+        cont.innerHTML = '<div class="msg">Ningún cliente coincide con esa búsqueda.</div>';
+        return;
+      }
+
+      filtrados.slice(0, 40).forEach(c=>{
+        const btn = document.createElement('button');
+        btn.className = 'card';
+        const badge = c.yaTieneUbicacion ? '<span style="display:inline-block; margin-left:8px; font-size:10.5px; font-weight:700; color:#8A6D3B; background:#FBF3E9; padding:2px 7px; border-radius:10px;">ya tiene — se reemplaza</span>' : '';
+        btn.innerHTML = `
+          <div class="cliente">${escapeHtml(c.nombre)}${badge}</div>
+          ${c.direccion ? `<div class="detalle">${escapeHtml(c.direccion)}</div>` : ''}
+          ${c.dia ? `<div class="fecha">${escapeHtml(c.dia)}</div>` : ''}
+        `;
+        btn.onclick = async ()=>{
+          main.innerHTML = '<div class="msg">Guardando...</div>';
+          try{
+            const resp = await cargarJSONP(BACKEND_URL + '?action=guardarUbicacionFijaGet&fila=' + encodeURIComponent(c.fila) + '&link=' + encodeURIComponent(link));
+            if(resp && resp.error) throw new Error(resp.error);
+            main.innerHTML = `<div class="msg ok">✓ Ubicación fija guardada para ${escapeHtml(c.nombre)} (columna T).<br><a href="./index.html?backend=${encodeURIComponent(BACKEND_URL)}" style="display:inline-block; margin-top:14px; padding:10px 18px; background:var(--teal); color:#fff; border-radius:8px; text-decoration:none; font-weight:700;">← Volver a la app</a></div>`;
+          }catch(err){
+            main.innerHTML = '<div class="msg err">No se pudo guardar: ' + escapeHtml(err.message) + '</div>';
+          }
+        };
+        cont.appendChild(btn);
+      });
+    }
+
+    renderLista('');
+    document.getElementById('buscarClienteInput').addEventListener('input', (e)=> renderLista(e.target.value));
   }catch(err){
     main.innerHTML = '<div class="msg err">No se pudo cargar la lista: ' + escapeHtml(err.message) + '</div>';
   }

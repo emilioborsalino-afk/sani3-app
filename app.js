@@ -951,7 +951,9 @@ function renderHistory(){
 
     div.innerHTML = `
       <div class="ticket-top">
-        <div class="ticket-client">${escapeHtml(rec.cliente)}</div>
+        <button class="ticket-client-edit" data-id="${rec.id}" title="Tocá para corregir nombre/dirección" style="background:none; border:none; padding:0; text-align:left; cursor:pointer; font:inherit;">
+          <span class="ticket-client">${escapeHtml(rec.cliente)} <span style="font-size:12px; opacity:0.6;">✏️</span></span>
+        </button>
         <div class="ticket-code">${rec.id.toUpperCase()}</div>
       </div>
       <div class="ticket-time">${formatDateTime(rec.fechaISO)}</div>
@@ -963,7 +965,6 @@ function renderHistory(){
       ${observacionBlock}
       <div class="ticket-actions">
         <button class="btn-wa" data-id="${rec.id}">Enviar por WhatsApp</button>
-        <button class="btn-editar-cliente" data-id="${rec.id}">✏️ Corregir nombre/dirección</button>
         <button class="btn-del" data-id="${rec.id}">Eliminar</button>
       </div>
     `;
@@ -993,7 +994,7 @@ function renderHistory(){
       }catch(err){ setStatus('No se pudo eliminar: ' + err.message, 'err'); }
     };
   });
-  wrap.querySelectorAll('.btn-editar-cliente').forEach(btn=>{
+  wrap.querySelectorAll('.ticket-client-edit').forEach(btn=>{
     btn.onclick = async ()=>{
       const id = btn.dataset.id;
       const rec = records.find(r=>r.id===id);
@@ -1002,8 +1003,8 @@ function renderHistory(){
       const seleccion = await mostrarSelectorCliente(rec.cliente, rec.direccion);
       if(!seleccion) return; // canceló
 
-      const textoOriginal = btn.textContent;
-      btn.textContent = 'Guardando...';
+      const textoOriginal = btn.innerHTML;
+      btn.innerHTML = '<span class="ticket-client">Guardando...</span>';
       btn.disabled = true;
       try{
         const resp = await backendPost({ action:'actualizarClienteRegistro', id, nombre: seleccion.nombre, direccion: seleccion.direccion });
@@ -1014,7 +1015,7 @@ function renderHistory(){
         setStatus('Nombre/dirección corregidos para este servicio.', 'ok');
       }catch(err){
         setStatus('No se pudo corregir: ' + err.message, 'err');
-        btn.textContent = textoOriginal;
+        btn.innerHTML = textoOriginal;
         btn.disabled = false;
       }
     };

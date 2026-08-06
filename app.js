@@ -829,6 +829,59 @@ function formatDateTime(iso){
   return d.toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'2-digit'}) + '  ' + formatTime(d);
 }
 
+/**
+ * Ventana con buscador para elegir un cliente existente (o escribirlo a mano
+ * si no está en la lista) al corregir el nombre/dirección de un ticket puntual.
+ * Devuelve { nombre, direccion } si confirma, o null si cancela.
+ */
+function mostrarSelectorCliente(nombreActual, direccionActual){
+  return new Promise((resolve)=>{
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed; inset:0; background:rgba(11,53,53,0.55); z-index:9999; display:flex; align-items:flex-end; justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:#fff; width:100%; max-width:520px; max-height:85vh; border-radius:16px 16px 0 0; padding:16px; display:flex; flex-direction:column; box-sizing:border-box;">
+        <div style="font-family:var(--disp); font-weight:700; font-size:16px; color:var(--teal-deep); margin-bottom:4px;">Corregir nombre/dirección</div>
+        <div style="font-size:11.5px; color:#8A9793; margin-bottom:10px;">Esto solo corrige este servicio puntual, no el resto del historial de ese cliente. Tocá el cliente correcto de la lista.</div>
+        <input id="selCliBuscador" type="text" placeholder="Buscar cliente..." style="width:100%; box-sizing:border-box; padding:10px; border:1px solid var(--line); border-radius:8px; font-size:14px; margin-bottom:10px;" autofocus>
+        <div id="selCliLista" style="overflow-y:auto; max-height:55vh; border:1px solid var(--line); border-radius:8px; margin-bottom:12px;"></div>
+        <button id="selCliCancelar" style="width:100%; padding:11px; background:none; border:1px solid var(--line); color:var(--teal); border-radius:8px; font-weight:700;">Cancelar</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const listaEl = overlay.querySelector('#selCliLista');
+    const buscadorEl = overlay.querySelector('#selCliBuscador');
+
+    function cerrar(resultado){
+      overlay.remove();
+      resolve(resultado);
+    }
+
+    function renderLista(filtro){
+      const f = (filtro||'').trim().toLowerCase();
+      const filtrados = f ? clients.filter(c=>c.nombre.toLowerCase().includes(f)) : clients;
+      listaEl.innerHTML = '';
+      if(filtrados.length === 0){
+        listaEl.innerHTML = '<div style="padding:12px; color:#8A9793; font-size:13px;">Ningún cliente coincide con esa búsqueda.</div>';
+        return;
+      }
+      filtrados.slice(0, 40).forEach(c=>{
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.style.cssText = 'display:block; width:100%; text-align:left; padding:10px; border:none; border-bottom:1px solid var(--line); background:none; font-size:13.5px; color:var(--ink); cursor:pointer;';
+        item.innerHTML = `<div style="font-weight:600;">${escapeHtml(c.nombre)}</div>${c.direccion ? `<div style="font-size:11.5px; color:#8A9793;">${escapeHtml(c.direccion)}</div>` : ''}`;
+        item.onclick = ()=> cerrar({ nombre: c.nombre, direccion: c.direccion || '' });
+        listaEl.appendChild(item);
+      });
+    }
+    renderLista('');
+    buscadorEl.oninput = ()=> renderLista(buscadorEl.value);
+
+    overlay.querySelector('#selCliCancelar').onclick = ()=> cerrar(null);
+    overlay.onclick = (e)=>{ if(e.target === overlay) cerrar(null); };
+  });
+}
+
 function renderHistory(){
   const wrap = document.getElementById('historyList');
   wrap.innerHTML = '';
@@ -910,6 +963,7 @@ function renderHistory(){
       ${observacionBlock}
       <div class="ticket-actions">
         <button class="btn-wa" data-id="${rec.id}">Enviar por WhatsApp</button>
+        <button class="btn-editar-cliente" data-id="${rec.id}">✏️ Corregir nombre/dirección</button>
         <button class="btn-del" data-id="${rec.id}">Eliminar</button>
       </div>
     `;
@@ -937,6 +991,32 @@ function renderHistory(){
         renderHistory();
         setStatus('Registro eliminado.', 'ok');
       }catch(err){ setStatus('No se pudo eliminar: ' + err.message, 'err'); }
+    };
+  });
+  wrap.querySelectorAll('.btn-editar-cliente').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const id = btn.dataset.id;
+      const rec = records.find(r=>r.id===id);
+      if(!rec) return;
+
+      const seleccion = await mostrarSelectorCliente(rec.cliente, rec.direccion);
+      if(!seleccion) return; // canceló
+
+      const textoOriginal = btn.textContent;
+      btn.textContent = 'Guardando...';
+      btn.disabled = true;
+      try{
+        const resp = await backendPost({ action:'actualizarClienteRegistro', id, nombre: seleccion.nombre, direccion: seleccion.direccion });
+        if(resp.error) throw new Error(resp.error);
+        rec.cliente = seleccion.nombre;
+        rec.direccion = seleccion.direccion;
+        renderHistory();
+        setStatus('Nombre/dirección corregidos para este servicio.', 'ok');
+      }catch(err){
+        setStatus('No se pudo corregir: ' + err.message, 'err');
+        btn.textContent = textoOriginal;
+        btn.disabled = false;
+      }
     };
   });
   wrap.querySelectorAll('.btn-buscar-maps').forEach(btn=>{

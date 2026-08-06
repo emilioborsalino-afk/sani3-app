@@ -179,6 +179,10 @@ async function mostrarClientesSinUbicacionFija(link){
       return;
     }
 
+    // Primero los que no tienen ubicación cargada todavía, al final los que ya tienen
+    // (se mantiene el orden original dentro de cada grupo).
+    clientes.sort((a, b) => (a.yaTieneUbicacion === b.yaTieneUbicacion) ? 0 : (a.yaTieneUbicacion ? 1 : -1));
+
     main.innerHTML = `
       <input id="buscarClienteInput" type="text" placeholder="Buscar cliente..." style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:10px; border:1px solid var(--line); border-radius:8px; font-family:var(--body); font-size:14px;">
       <div id="listaClientesFija"></div>

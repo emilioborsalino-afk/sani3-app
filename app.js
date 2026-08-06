@@ -870,7 +870,10 @@ function mostrarSelectorCliente(nombreActual, direccionActual){
         item.type = 'button';
         item.style.cssText = 'display:block; width:100%; text-align:left; padding:10px; border:none; border-bottom:1px solid var(--line); background:none; font-size:13.5px; color:var(--ink); cursor:pointer;';
         item.innerHTML = `<div style="font-weight:600;">${escapeHtml(c.nombre)}</div>${c.direccion ? `<div style="font-size:11.5px; color:#8A9793;">${escapeHtml(c.direccion)}</div>` : ''}`;
-        item.onclick = ()=> cerrar({ nombre: c.nombre, direccion: c.direccion || '' });
+        item.onclick = ()=>{
+          const confirmado = confirm(`¿Cambiar "${nombreActual || '(sin nombre)'}" por "${c.nombre}"?`);
+          if(confirmado) cerrar({ nombre: c.nombre, direccion: c.direccion || '' });
+        };
         listaEl.appendChild(item);
       });
     }

@@ -140,16 +140,16 @@ function inicioSemanaActual(){
 
 const DIA_INDEX = { 'Domingo':0, 'Lunes':1, 'Martes':2, 'Miercoles':3, 'Jueves':4, 'Viernes':5, 'Sabado':6 };
 
-function hechoEsteDia(nombreCliente, diaCanon){
+function registroHechoEsteDia(nombreCliente, diaCanon){
   const inicio = inicioSemanaActual();
   const idxEsperado = DIA_INDEX[diaCanon];
-  if(idxEsperado == null) return false; // "Otros" no tiene día fijo, no aplica el check
-  return records.some(r=>{
+  if(idxEsperado == null) return null; // "Otros" no tiene día fijo, no aplica el check
+  return records.find(r=>{
     if(r.cliente !== nombreCliente) return false;
     const f = new Date(r.fechaISO);
     if(f < inicio) return false;
     return f.getDay() === idxEsperado;
-  });
+  }) || null;
 }
 
 let selectedClientIndex = null;
@@ -219,7 +219,15 @@ function renderClientSelect(){
       const btnInfo = document.createElement('button');
       btnInfo.type = 'button';
       btnInfo.style.cssText = 'flex:1; text-align:left; padding:12px 14px; border:none; background:none; font-family:var(--body); font-size:14.5px; color:var(--ink); cursor:pointer;';
-      const check = hechoEsteDia(c.nombre, d) ? ' <span style="color:var(--green); font-weight:700;">✓ hecho esta semana</span>' : '';
+      const registroSemana = registroHechoEsteDia(c.nombre, d);
+      let check = '';
+      if(registroSemana){
+        const esOk = registroSemana.resultado === 'Se limpió y se desagotó';
+        const color = esOk ? 'var(--green)' : '#C0392B';
+        const marca = esOk ? '✓' : '⚠️';
+        const textoResultado = registroSemana.resultado || '(sin resultado cargado)';
+        check = ` <span style="color:${color}; font-weight:700;">${marca} ${escapeHtml(textoResultado)}</span>`;
+      }
       btnInfo.innerHTML = (c.direccion
         ? `<strong>${escapeHtml(c.nombre)}</strong><br><span style="color:#8A9793; font-size:12.5px;">${escapeHtml(c.direccion)}</span>`
         : `<strong>${escapeHtml(c.nombre)}</strong>`) + check;

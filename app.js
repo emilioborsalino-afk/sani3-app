@@ -169,6 +169,20 @@ function updateSelectedLabel(){
   }
 }
 
+function irAlTicket(id){
+  const el = document.getElementById('ticket-' + id);
+  if(!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const fondoOriginal = el.style.background;
+  const transicionOriginal = el.style.transition;
+  el.style.transition = 'background 0.3s';
+  el.style.background = '#FFF3D6';
+  setTimeout(()=>{
+    el.style.background = fondoOriginal;
+    setTimeout(()=>{ el.style.transition = transicionOriginal; }, 350);
+  }, 1400);
+}
+
 function renderClientSelect(){
   const wrap = document.getElementById('clientAccordion');
   wrap.innerHTML = '';
@@ -244,6 +258,12 @@ function renderClientSelect(){
         // colapsamos todo despues de elegir, para que quede prolijo
         wrap.querySelectorAll('.acc-body').forEach(b=>b.style.display='none');
         wrap.querySelectorAll('.acc-arrow').forEach(a=>a.textContent='▾');
+
+        // si ya se le hizo un servicio esta semana, lo llevamos directo a ese ticket
+        // (para ver la foto, agregar una observación, o corregir el resultado)
+        if(registroSemana){
+          setTimeout(()=> irAlTicket(registroSemana.id), 150);
+        }
       };
       item.appendChild(btnInfo);
 
@@ -906,6 +926,7 @@ function renderHistory(){
   records.forEach(rec=>{
     const div = document.createElement('div');
     div.className = 'ticket';
+    div.id = 'ticket-' + rec.id;
     const direccionLine = rec.direccion ? `<div style="margin-bottom:4px;">${escapeHtml(rec.direccion)}</div>` : '';
 
     let ubicacionBlock;

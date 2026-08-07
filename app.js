@@ -156,13 +156,16 @@ let selectedClientIndex = null;
 
 function updateSelectedLabel(){
   const label = document.getElementById('selectedClientLabel');
+  const labelBottom = document.getElementById('selectedClientLabelBottom');
   const c = (selectedClientIndex != null) ? clients[selectedClientIndex] : null;
   if(!c){
     label.textContent = 'Ningún cliente elegido todavía';
     label.style.color = '#8A9793';
+    if(labelBottom){ labelBottom.textContent = 'Ningún cliente elegido todavía'; labelBottom.style.color = '#8A9793'; }
   } else {
     label.textContent = 'Elegido: ' + c.nombre + (c.direccion ? ' — ' + c.direccion : '');
     label.style.color = 'var(--teal-deep)';
+    if(labelBottom){ labelBottom.textContent = 'Le vas a sacar la foto a: ' + c.nombre + (c.direccion ? ' — ' + c.direccion : ''); labelBottom.style.color = 'var(--teal-deep)'; }
   }
 }
 

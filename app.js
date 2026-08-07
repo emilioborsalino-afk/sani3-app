@@ -272,16 +272,24 @@ function renderClientSelect(){
       btnMapa.style.cssText = 'flex-shrink:0; width:46px; border:none; border-left:1px solid var(--line); background:none; font-size:18px; cursor:pointer;';
 
       if(!window.MODO_EMPLEADO){
-        // Solo en tu app: abre Maps y te recuerda compartir desde ahí para cargar/cambiar la columna T.
         btnMapa.textContent = '📍';
-        if(!c.ubicacionFija) btnMapa.style.opacity = '0.4';
-        btnMapa.title = c.ubicacionFija ? 'Tocá para cambiar la ubicación fija de este baño' : 'Tocá para cargar la ubicación fija de este baño';
-        btnMapa.onclick = (e)=>{
-          e.stopPropagation();
-          const accion = c.ubicacionFija ? 'cambiar' : 'cargar';
-          window.open('https://www.google.com/maps', '_blank');
-          setStatus(`Buscá "${c.nombre}" en Maps, tocá "Compartir" → elegí "Sani3", y seguí los pasos para ${accion} su ubicación fija.`, 'ok');
-        };
+        if(c.ubicacionFija){
+          // Ya tiene ubicación guardada: te lleva directo ahí.
+          btnMapa.title = 'Tocá para ir a la ubicación fija de este baño';
+          btnMapa.onclick = (e)=>{
+            e.stopPropagation();
+            window.open(c.ubicacionFija, '_blank');
+          };
+        } else {
+          // Todavía no tiene: abre Maps en blanco para buscar y compartir desde ahí.
+          btnMapa.style.opacity = '0.4';
+          btnMapa.title = 'Tocá para cargar la ubicación fija de este baño';
+          btnMapa.onclick = (e)=>{
+            e.stopPropagation();
+            window.open('https://www.google.com/maps', '_blank');
+            setStatus(`Buscá "${c.nombre}" en Maps, tocá "Compartir" → elegí "Sani3", y seguí los pasos para cargar su ubicación fija.`, 'ok');
+          };
+        }
       } else if(c.ubicacionFija){
         btnMapa.title = 'Ir a la ubicación de este baño';
         btnMapa.textContent = '📍';

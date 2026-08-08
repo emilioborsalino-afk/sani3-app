@@ -456,38 +456,6 @@ if(document.getElementById('toggleClientListBtn')){
   };
 }
 
-if(document.getElementById('toggleReservaBtn')){
-  document.getElementById('toggleReservaBtn').onclick = async ()=>{
-    const listEl = document.getElementById('reservaList');
-    const btn = document.getElementById('toggleReservaBtn');
-    const visible = listEl.style.display !== 'none';
-    if(visible){
-      listEl.style.display = 'none';
-      btn.textContent = '📋 Ver clientes en reserva (agregados, sin activar)';
-      return;
-    }
-    listEl.style.display = 'block';
-    btn.textContent = '📋 Ocultar clientes en reserva';
-    listEl.innerHTML = '<div style="padding:10px; color:#8A9793; font-size:13px;">Cargando...</div>';
-    try{
-      const reserva = await backendGet('clientesEnReserva');
-      if(!reserva || reserva.length === 0){
-        listEl.innerHTML = '<div style="padding:10px; color:#8A9793; font-size:13px;">No hay clientes en reserva por ahora.</div>';
-        return;
-      }
-      listEl.innerHTML = reserva.map(c => `
-        <div style="padding:10px; border-bottom:1px solid var(--line);">
-          <div style="font-weight:600; font-size:13.5px;">${escapeHtml(c.nombre)}</div>
-          <div style="font-size:12px; color:#8A9793;">${escapeHtml(c.direccion || '(sin dirección todavía)')}</div>
-          ${c.ubicacionFija ? `<a href="${escapeHtml(c.ubicacionFija)}" target="_blank" style="font-size:12px;">📍 Ver ubicación guardada</a>` : '<div style="font-size:11.5px; color:#C0392B;">Sin ubicación GPS cargada</div>'}
-        </div>
-      `).join('') + '<div style="padding:10px; font-size:11.5px; color:#8A9793;">Para activarlos, completá teléfono y día directo en la planilla, y movelos a la zona de clientes activos.</div>';
-    }catch(err){
-      listEl.innerHTML = `<div style="padding:10px; color:#C0392B; font-size:13px;">No se pudo cargar: ${escapeHtml(err.message)}</div>`;
-    }
-  };
-}
-
 function abrirMapsEnMiUbicacion(botonEstado){
   if(botonEstado) botonEstado.textContent = 'Ubicando...';
   const restaurar = (texto)=>{ if(botonEstado) botonEstado.textContent = texto; };

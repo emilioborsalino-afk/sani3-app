@@ -116,6 +116,18 @@ document.getElementById('refreshBtn').onclick = async ()=>{
 // ---------- Clientes ----------
 
 const DIAS_CANON = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
+
+function formatFechaCorta(fechaISO){
+  if(!fechaISO) return '';
+  const partes = String(fechaISO).split('-'); // viene como "yyyy-mm-dd"
+  if(partes.length !== 3) return fechaISO;
+  const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const dia = parseInt(partes[2], 10);
+  const mesIdx = parseInt(partes[1], 10) - 1;
+  const anio = partes[0].slice(-2);
+  if(isNaN(dia) || mesIdx < 0 || mesIdx > 11) return fechaISO;
+  return `${dia} ${meses[mesIdx]} ${anio}`;
+}
 function normalizar(s){
   return (s||'').toLowerCase()
     .replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u');
@@ -206,6 +218,17 @@ function renderClientSelect(){
     diasDeCliente(c).forEach(d => grupos[d].push(i));
   });
 
+  // Dentro de "Otros / Empresas con reserva", ordenamos por fecha de inicio:
+  // primero la más próxima, al final los que no tienen fecha cargada todavía.
+  grupos['Otros'].sort((a, b)=>{
+    const fa = clients[a].fechaInicio;
+    const fb = clients[b].fechaInicio;
+    if(!fa && !fb) return 0;
+    if(!fa) return 1;
+    if(!fb) return -1;
+    return fa < fb ? -1 : (fa > fb ? 1 : 0);
+  });
+
   DIAS_CANON.concat(['Otros']).forEach(d=>{
     if(grupos[d].length === 0) return;
 
@@ -248,7 +271,7 @@ function renderClientSelect(){
       let extraReserva = '';
       if(d === 'Otros' && !window.MODO_EMPLEADO){
         const datos = [];
-        if(c.fechaInicio) datos.push('Inicio: ' + c.fechaInicio);
+        if(c.fechaInicio) datos.push('Inicio: ' + formatFechaCorta(c.fechaInicio));
         if(c.motivo) datos.push(c.motivo);
         if(c.cantidad) datos.push('Cant: ' + c.cantidad);
         if(datos.length){

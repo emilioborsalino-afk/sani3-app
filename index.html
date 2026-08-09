@@ -258,15 +258,13 @@
     </div>
     <div class="row">
       <input class="client-input" id="newClientAddrInput" placeholder="Dirección / ubicación">
-      <button class="btn-small" id="addClientBtn">Agregar</button>
-    </div>
-    <div style="display:flex; gap:8px; margin-top:8px;">
-      <button type="button" id="usarMiUbicacionNuevoClienteBtn" style="flex:1; background:var(--green); color:#fff; font-family:var(--body); font-weight:600; font-size:12.5px; padding:7px; border-radius:6px;">📍 Usar mi ubicación actual</button>
-      <button type="button" id="buscarMapsNuevoClienteBtn" style="flex:1; background:var(--teal); color:#fff; font-family:var(--body); font-weight:600; font-size:12.5px; padding:7px; border-radius:6px;">🗺️ Abrir Maps</button>
     </div>
     <div style="font-size:11.5px; color:#8A9793; margin-top:10px; margin-bottom:4px;">Datos opcionales para la planilla (podés dejarlos vacíos y completarlos después ahí):</div>
     <div class="row">
-      <input class="client-input" type="date" id="fechaInicioNuevoClienteInput" placeholder="Fecha de inicio">
+      <div style="flex:1;">
+        <div style="font-size:11.5px; color:#8A9793; margin-bottom:3px;">Fecha de inicio</div>
+        <input class="client-input" type="date" id="fechaInicioNuevoClienteInput" style="width:100%; box-sizing:border-box;">
+      </div>
       <input class="client-input" type="number" min="1" id="cantNuevoClienteInput" placeholder="Cantidad" style="max-width:110px;">
     </div>
     <div class="row">
@@ -276,6 +274,11 @@
         <option value="Evento">Evento</option>
       </select>
     </div>
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      <button type="button" id="usarMiUbicacionNuevoClienteBtn" style="flex:1; background:var(--green); color:#fff; font-family:var(--body); font-weight:600; font-size:12.5px; padding:7px; border-radius:6px;">📍 Usar mi ubicación actual</button>
+      <button type="button" id="buscarMapsNuevoClienteBtn" style="flex:1; background:var(--teal); color:#fff; font-family:var(--body); font-weight:600; font-size:12.5px; padding:7px; border-radius:6px;">🗺️ Abrir Maps</button>
+    </div>
+    <button class="btn-small" id="addClientBtn" style="width:100%; margin-top:10px;">Agregar</button>
     <div class="solo-dueno">
       <button id="toggleClientListBtn" style="width:100%; margin-top:10px; background:none; color:var(--teal); font-family:var(--body); font-weight:600; font-size:13px; padding:8px;">Ver lista completa de clientes</button>
       <div id="clientList" style="display:none;"></div>
@@ -333,7 +336,7 @@
 </div>
 
 <script>window.MODO_EMPLEADO = false;</script>
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 
 </body>
 </html>

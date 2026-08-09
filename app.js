@@ -245,9 +245,19 @@ function renderClientSelect(){
         const textoResultado = registroSemana.resultado || '(sin resultado cargado)';
         check = ` <span style="color:${color}; font-weight:700;">${marca} ${escapeHtml(textoResultado)}</span>`;
       }
+      let extraReserva = '';
+      if(d === 'Otros' && !window.MODO_EMPLEADO){
+        const datos = [];
+        if(c.fechaInicio) datos.push('Inicio: ' + c.fechaInicio);
+        if(c.motivo) datos.push(c.motivo);
+        if(c.cantidad) datos.push('Cant: ' + c.cantidad);
+        if(datos.length){
+          extraReserva = `<br><span style="color:#8A9793; font-size:11.5px;">${escapeHtml(datos.join(' · '))}</span>`;
+        }
+      }
       btnInfo.innerHTML = (c.direccion
         ? `<strong>${escapeHtml(c.nombre)}</strong><br><span style="color:#8A9793; font-size:12.5px;">${escapeHtml(c.direccion)}</span>`
-        : `<strong>${escapeHtml(c.nombre)}</strong>`) + check;
+        : `<strong>${escapeHtml(c.nombre)}</strong>`) + extraReserva + check;
       btnInfo.onclick = ()=>{
         selectedClientIndex = i;
         updateSelectedLabel();
@@ -524,7 +534,7 @@ if(document.getElementById('addClientBtn')){
     }
     try{
       await backendPost({ action:'addClient', nombre: name, direccion: addr, ubicacionFija: nuevaUbicacionFija, fechaInicio, cantidad, motivo });
-      clients.push({ nombre: name, direccion: addr, dia:'', telefono:'', fechaInicio: fechaInicio || '', ubicacionFija: nuevaUbicacionFija });
+      clients.push({ nombre: name, direccion: addr, dia:'', telefono:'', fechaInicio: fechaInicio || '', ubicacionFija: nuevaUbicacionFija, cantidad: cantidad || '', motivo: motivo || '' });
       input.value = '';
       addrInput.value = '';
       if(fechaInicioInput) fechaInicioInput.value = '';

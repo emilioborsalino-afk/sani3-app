@@ -510,17 +510,26 @@ if(document.getElementById('addClientBtn')){
   document.getElementById('addClientBtn').onclick = async ()=>{
     const input = document.getElementById('newClientInput');
     const addrInput = document.getElementById('newClientAddrInput');
+    const fechaInicioInput = document.getElementById('fechaInicioNuevoClienteInput');
+    const cantInput = document.getElementById('cantNuevoClienteInput');
+    const motivoInput = document.getElementById('motivoNuevoClienteInput');
     const name = input.value.trim();
     const addr = addrInput.value.trim();
+    const fechaInicio = fechaInicioInput ? fechaInicioInput.value : '';
+    const cantidad = cantInput ? cantInput.value.trim() : '';
+    const motivo = motivoInput ? motivoInput.value : '';
     if(!name){
       setStatus('Escribí un nombre antes de tocar Agregar (esto es solo para clientes nuevos, los que ya existen se eligen arriba en el desplegable).', 'err');
       return;
     }
     try{
-      await backendPost({ action:'addClient', nombre: name, direccion: addr, ubicacionFija: nuevaUbicacionFija });
-      clients.push({ nombre: name, direccion: addr, dia:'', telefono:'', fechaInicio:'', ubicacionFija: nuevaUbicacionFija });
+      await backendPost({ action:'addClient', nombre: name, direccion: addr, ubicacionFija: nuevaUbicacionFija, fechaInicio, cantidad, motivo });
+      clients.push({ nombre: name, direccion: addr, dia:'', telefono:'', fechaInicio: fechaInicio || '', ubicacionFija: nuevaUbicacionFija });
       input.value = '';
       addrInput.value = '';
+      if(fechaInicioInput) fechaInicioInput.value = '';
+      if(cantInput) cantInput.value = '';
+      if(motivoInput) motivoInput.value = '';
       nuevaUbicacionFija = '';
       document.getElementById('usarMiUbicacionNuevoClienteBtn').textContent = '📍 Usar mi ubicación actual';
       renderClientSelect();

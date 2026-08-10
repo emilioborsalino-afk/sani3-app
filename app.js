@@ -380,6 +380,7 @@ function crearFilaCliente(c, i, grupo){
   let marcaTexto = '';
   if(c.marcaRetiro === 'rojo') marcaTexto = ' <span style="color:#B4432B; font-weight:700; font-size:12px;">🔴 Marcado para retirar</span>';
   else if(c.marcaRetiro === 'amarillo') marcaTexto = ' <span style="color:#A98600; font-weight:700; font-size:12px;">🟡 Marcado para retirar</span>';
+  else if(c.marcaRetiro === 'marcado') marcaTexto = ' <span style="color:#B5711A; font-weight:700; font-size:12px;">🟠 Marcado para retirar</span>';
   const label = (c.direccion
     ? `${escapeHtml(c.nombre)} <span style="color:#8A9793;">— ${escapeHtml(c.direccion)}</span>`
     : escapeHtml(c.nombre)) + marcaTexto;

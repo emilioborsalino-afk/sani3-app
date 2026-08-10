@@ -154,13 +154,14 @@ const DIA_INDEX = { 'Domingo':0, 'Lunes':1, 'Martes':2, 'Miercoles':3, 'Jueves':
 
 function registroHechoEsteDia(nombreCliente, diaCanon){
   const inicio = inicioSemanaActual();
-  const idxEsperado = DIA_INDEX[diaCanon];
-  if(idxEsperado == null) return null; // "Otros" no tiene día fijo, no aplica el check
+  if(diaCanon === 'Otros') return null; // "Otros" no tiene día fijo, no aplica el check
+  // Buscamos el registro más nuevo de este cliente en lo que va de la semana,
+  // sin importar en qué día exacto se haya hecho (a veces se adelanta o atrasa
+  // respecto al día que tiene asignado, y de todas formas cuenta como hecho).
   return records.find(r=>{
     if(r.cliente !== nombreCliente) return false;
     const f = new Date(r.fechaISO);
-    if(f < inicio) return false;
-    return f.getDay() === idxEsperado;
+    return f >= inicio;
   }) || null;
 }
 

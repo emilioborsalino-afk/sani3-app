@@ -508,19 +508,20 @@ function renderClientList(){
   }
 
   const grupos = {};
-  DIAS_CANON.concat(['Otros']).forEach(d => grupos[d] = []);
+  DIAS_CANON.concat(['ProximoRetirar', 'Otros']).forEach(d => grupos[d] = []);
   clients.forEach((c, i)=>{
     if(filtro && !c.nombre.toLowerCase().includes(filtro)) return;
     diasDeCliente(c).forEach(d => grupos[d].push(i));
+    if(c.marcaRetiro) grupos['ProximoRetirar'].push(i);
   });
 
-  const hayResultados = DIAS_CANON.concat(['Otros']).some(d => grupos[d].length > 0);
+  const hayResultados = DIAS_CANON.concat(['ProximoRetirar', 'Otros']).some(d => grupos[d].length > 0);
   if(filtro && !hayResultados){
     wrap.innerHTML = '<div class="empty" style="padding:16px 0;">Ningún cliente coincide con esa búsqueda.</div>';
     return;
   }
 
-  DIAS_CANON.concat(['Otros']).forEach(d=>{
+  DIAS_CANON.concat(['ProximoRetirar', 'Otros']).forEach(d=>{
     if(grupos[d].length === 0) return;
 
     const section = document.createElement('div');
@@ -528,9 +529,11 @@ function renderClientList(){
 
     const header = document.createElement('button');
     header.type = 'button';
-    header.style.cssText = 'width:100%; text-align:left; background:var(--amber); color:#fff; padding:11px 14px; font-family:var(--disp); font-weight:700; font-size:14px; border:none; display:flex; justify-content:space-between; align-items:center; cursor:pointer;';
+    const esProximoRetirar = d === 'ProximoRetirar';
+    header.style.cssText = 'width:100%; text-align:left; background:' + (esProximoRetirar ? '#B5711A' : 'var(--amber)') + '; color:#fff; padding:11px 14px; font-family:var(--disp); font-weight:700; font-size:14px; border:none; display:flex; justify-content:space-between; align-items:center; cursor:pointer;';
     const label = document.createElement('span');
-    label.textContent = (d === 'Otros' ? 'Otros / Empresas con reserva' : d) + ` (${grupos[d].length})`;
+    const nombreGrupo = esProximoRetirar ? '🟠 Empresas próximo a retirar' : (d === 'Otros' ? 'Otros / Empresas con reserva' : d);
+    label.textContent = nombreGrupo + ` (${grupos[d].length})`;
     const arrow = document.createElement('span');
     arrow.textContent = filtro ? '▴' : '▾';
     arrow.className = 'acc-arrow-list';

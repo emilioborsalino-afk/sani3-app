@@ -378,9 +378,14 @@ function crearFilaCliente(c, i, grupo){
   const div = document.createElement('div');
   div.className = 'client-chip';
   let marcaTexto = '';
-  if(c.marcaRetiro === 'rojo') marcaTexto = ' <span style="color:#B4432B; font-weight:700; font-size:12px;">🔴 Marcado para retirar</span>';
-  else if(c.marcaRetiro === 'amarillo') marcaTexto = ' <span style="color:#A98600; font-weight:700; font-size:12px;">🟡 Marcado para retirar</span>';
-  else if(c.marcaRetiro === 'marcado') marcaTexto = ' <span style="color:#B5711A; font-weight:700; font-size:12px;">🟠 Marcado para retirar</span>';
+  if(c.marcaRetiro){
+    // Buscamos el pedacito de la observación que empieza con "Retirar", para mostrar la fecha real puesta ahí.
+    const partesObs = (c.observacion || '').split('|').map(p => p.trim());
+    const notaRetirar = partesObs.find(p => p.toLowerCase().indexOf('retirar') === 0) || 'Retirar';
+    const icono = c.marcaRetiro === 'rojo' ? '🔴' : (c.marcaRetiro === 'amarillo' ? '🟡' : '🟠');
+    const color = c.marcaRetiro === 'rojo' ? '#B4432B' : (c.marcaRetiro === 'amarillo' ? '#A98600' : '#B5711A');
+    marcaTexto = ` <span style="color:${color}; font-weight:700; font-size:12px;">${icono} ${escapeHtml(notaRetirar)}</span>`;
+  }
   const label = (c.direccion
     ? `${escapeHtml(c.nombre)} <span style="color:#8A9793;">— ${escapeHtml(c.direccion)}</span>`
     : escapeHtml(c.nombre)) + marcaTexto;
@@ -511,8 +516,10 @@ function renderClientList(){
   DIAS_CANON.concat(['ProximoRetirar', 'Otros']).forEach(d => grupos[d] = []);
   clients.forEach((c, i)=>{
     if(filtro && !c.nombre.toLowerCase().includes(filtro)) return;
-    diasDeCliente(c).forEach(d => grupos[d].push(i));
-    if(c.marcaRetiro) grupos['ProximoRetirar'].push(i);
+    const dias = diasDeCliente(c);
+    dias.forEach(d => grupos[d].push(i));
+    const esDiaActivo = dias.some(d => d !== 'Otros'); // solo Lunes a Sábado, no "Empresas con reserva"
+    if(c.marcaRetiro && esDiaActivo) grupos['ProximoRetirar'].push(i);
   });
 
   const hayResultados = DIAS_CANON.concat(['ProximoRetirar', 'Otros']).some(d => grupos[d].length > 0);

@@ -567,6 +567,17 @@ function renderClientList(){
     if(c.marcaRetiro && esDiaActivo) grupos['ProximoRetirar'].push(i);
   });
 
+  // Dentro de "Otros / Empresas con reserva", ordenamos por fecha de inicio:
+  // primero la más próxima, al final los que no tienen fecha cargada todavía.
+  grupos['Otros'].sort((a, b)=>{
+    const fa = clients[a].fechaInicio;
+    const fb = clients[b].fechaInicio;
+    if(!fa && !fb) return 0;
+    if(!fa) return 1;
+    if(!fb) return -1;
+    return fa < fb ? -1 : (fa > fb ? 1 : 0);
+  });
+
   const hayResultados = DIAS_CANON.concat(['ProximoRetirar', 'Otros']).some(d => grupos[d].length > 0);
   if(filtro && !hayResultados){
     wrap.innerHTML = '<div class="empty" style="padding:16px 0;">Ningún cliente coincide con esa búsqueda.</div>';

@@ -385,6 +385,10 @@ function crearFilaCliente(c, i, grupo){
     const icono = c.marcaRetiro === 'rojo' ? '🔴' : (c.marcaRetiro === 'amarillo' ? '🟡' : '🟠');
     const color = c.marcaRetiro === 'rojo' ? '#B4432B' : (c.marcaRetiro === 'amarillo' ? '#A98600' : '#B5711A');
     marcaTexto = ` <span style="color:${color}; font-weight:700; font-size:12px;">${icono} ${escapeHtml(notaRetirar)}</span>`;
+  } else if(c.colorReserva === 'amarillo'){
+    marcaTexto = ' 🟡';
+  } else if(c.colorReserva === 'verde'){
+    marcaTexto = ' 🟢';
   }
   const label = (c.direccion
     ? `${escapeHtml(c.nombre)} <span style="color:#8A9793;">— ${escapeHtml(c.direccion)}</span>`
@@ -430,7 +434,46 @@ function crearFilaCliente(c, i, grupo){
   acciones.appendChild(btnLink);
 
   if(grupo === 'Otros'){
-    // Clientes en "Empresas con reserva": acá sí se borran de verdad, con confirmación.
+    // Clientes en "Empresas con reserva": desplegable de color (sin tocar Observaciones), más el botón de borrar de verdad.
+    const selectColorReserva = document.createElement('select');
+    selectColorReserva.className = 'client-input';
+    selectColorReserva.style.cssText = 'font-size:13px; padding:5px 6px; max-width:170px;';
+    selectColorReserva.innerHTML = `
+      <option value="">Color...</option>
+      <option value="amarillo">🟡 Amarillo</option>
+      <option value="verde">🟢 Verde</option>
+      <option value="blanco">⚪ Sin color</option>
+    `;
+    if(c.colorReserva) selectColorReserva.value = c.colorReserva;
+
+    const btnAplicarColor = document.createElement('button');
+    btnAplicarColor.textContent = 'Aplicar';
+    btnAplicarColor.style.color = '#B5711A';
+    btnAplicarColor.onclick = async ()=>{
+      const color = selectColorReserva.value;
+      if(!color){
+        setStatus('Elegí primero un color del desplegable.', 'err');
+        return;
+      }
+      const textoOriginal = btnAplicarColor.textContent;
+      btnAplicarColor.textContent = 'Aplicando...';
+      btnAplicarColor.disabled = true;
+      try{
+        await backendPost({ action:'marcarColorReserva', nombre: c.nombre, direccion: c.direccion || '', color });
+        c.colorReserva = (color === 'blanco') ? '' : color;
+        setStatus(color === 'blanco' ? ('Se sacó el color de ' + c.nombre) : ('Marcado (' + color + '): ' + c.nombre), 'ok');
+        renderClientList();
+        return;
+      }catch(err){
+        setStatus('No se pudo marcar: ' + err.message, 'err');
+      }
+      btnAplicarColor.textContent = textoOriginal;
+      btnAplicarColor.disabled = false;
+    };
+
+    acciones.appendChild(selectColorReserva);
+    acciones.appendChild(btnAplicarColor);
+
     const btnQuitar = document.createElement('button');
     btnQuitar.textContent = 'Quitar';
     btnQuitar.style.color = '#C0392B';
@@ -642,23 +685,26 @@ if(document.getElementById('addClientBtn')){
     const fechaInicioInput = document.getElementById('fechaInicioNuevoClienteInput');
     const cantInput = document.getElementById('cantNuevoClienteInput');
     const motivoInput = document.getElementById('motivoNuevoClienteInput');
+    const colorInput = document.getElementById('colorNuevoClienteInput');
     const name = input.value.trim();
     const addr = addrInput.value.trim();
     const fechaInicio = fechaInicioInput ? fechaInicioInput.value : '';
     const cantidad = cantInput ? cantInput.value.trim() : '';
     const motivo = motivoInput ? motivoInput.value : '';
+    const colorElegido = colorInput ? colorInput.value : '';
     if(!name){
       setStatus('Escribí un nombre antes de tocar Agregar (esto es solo para clientes nuevos, los que ya existen se eligen arriba en el desplegable).', 'err');
       return;
     }
     try{
-      await backendPost({ action:'addClient', nombre: name, direccion: addr, ubicacionFija: nuevaUbicacionFija, fechaInicio, cantidad, motivo });
-      clients.push({ nombre: name, direccion: addr, dia:'', telefono:'', fechaInicio: fechaInicio || '', ubicacionFija: nuevaUbicacionFija, cantidad: cantidad || '', motivo: motivo || '' });
+      await backendPost({ action:'addClient', nombre: name, direccion: addr, ubicacionFija: nuevaUbicacionFija, fechaInicio, cantidad, motivo, colorElegido });
+      clients.push({ nombre: name, direccion: addr, dia:'', telefono:'', fechaInicio: fechaInicio || '', ubicacionFija: nuevaUbicacionFija, cantidad: cantidad || '', motivo: motivo || '', colorReserva: colorElegido || '' });
       input.value = '';
       addrInput.value = '';
       if(fechaInicioInput) fechaInicioInput.value = '';
       if(cantInput) cantInput.value = '';
       if(motivoInput) motivoInput.value = '';
+      if(colorInput) colorInput.value = '';
       nuevaUbicacionFija = '';
       document.getElementById('usarMiUbicacionNuevoClienteBtn').textContent = '📍 Usar mi ubicación actual';
       renderClientSelect();

@@ -264,18 +264,28 @@
       <input class="client-input" id="newClientAddrInput" placeholder="Dirección / ubicación">
     </div>
     <div style="font-size:11.5px; color:#8A9793; margin-top:10px; margin-bottom:4px;">Datos opcionales para la planilla (podés dejarlos vacíos y completarlos después ahí):</div>
-    <div class="row">
-      <div style="flex:1;">
-        <div style="font-size:11.5px; color:#8A9793; margin-bottom:3px;">Fecha de inicio</div>
-        <input class="client-input" type="date" id="fechaInicioNuevoClienteInput" style="width:100%; box-sizing:border-box;">
+    <div class="row" style="align-items:flex-end;">
+      <div style="flex:1.4;">
+        <div style="font-size:11px; color:#8A9793; margin-bottom:3px;">Fecha de inicio</div>
+        <input class="client-input" type="date" id="fechaInicioNuevoClienteInput" style="width:100%; box-sizing:border-box; font-size:12.5px; padding:6px;">
       </div>
-      <input class="client-input" type="number" min="1" id="cantNuevoClienteInput" placeholder="Cantidad" style="max-width:110px;">
+      <div style="flex:0.7;">
+        <div style="font-size:11px; color:#8A9793; margin-bottom:3px;">Cantidad</div>
+        <input class="client-input" type="number" min="1" id="cantNuevoClienteInput" style="width:100%; box-sizing:border-box; font-size:12.5px; padding:6px;">
+      </div>
     </div>
     <div class="row">
       <select class="client-input" id="motivoNuevoClienteInput" style="width:100%;">
         <option value="">Motivo de contratación (opcional)</option>
         <option value="Mensual">Mensual</option>
         <option value="Evento">Evento</option>
+      </select>
+    </div>
+    <div class="row">
+      <select class="client-input" id="colorNuevoClienteInput" style="width:100%;">
+        <option value="">Color al agregarlo: celeste (por defecto)</option>
+        <option value="amarillo">🟡 Amarillo</option>
+        <option value="verde">🟢 Verde</option>
       </select>
     </div>
     <div style="display:flex; gap:8px; margin-top:10px;">
@@ -343,7 +353,7 @@
 </div>
 
 <script>window.MODO_EMPLEADO = false;</script>
-<script src="app.js?v=22"></script>
+<script src="app.js?v=23"></script>
 
 </body>
 </html>

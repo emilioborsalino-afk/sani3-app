@@ -152,14 +152,18 @@ function inicioSemanaActual(){
 
 const DIA_INDEX = { 'Domingo':0, 'Lunes':1, 'Martes':2, 'Miercoles':3, 'Jueves':4, 'Viernes':5, 'Sabado':6 };
 
-function registroHechoEsteDia(nombreCliente, diaCanon){
+function registroHechoEsteDia(nombreCliente, direccionCliente, diaCanon){
   const inicio = inicioSemanaActual();
   if(diaCanon === 'Otros') return null; // "Otros" no tiene día fijo, no aplica el check
+  const direccionNorm = (direccionCliente || '').trim().toLowerCase();
   // Buscamos el registro más nuevo de este cliente en lo que va de la semana,
   // sin importar en qué día exacto se haya hecho (a veces se adelanta o atrasa
   // respecto al día que tiene asignado, y de todas formas cuenta como hecho).
+  // Comparamos nombre Y dirección, para no confundir a dos clientes homónimos
+  // que viven en lugares distintos (por ejemplo, dos "Maurino Paula" distintas).
   return records.find(r=>{
     if(r.cliente !== nombreCliente) return false;
+    if((r.direccion || '').trim().toLowerCase() !== direccionNorm) return false;
     const f = new Date(r.fechaISO);
     return f >= inicio;
   }) || null;
@@ -270,7 +274,7 @@ function renderClientSelect(){
       const btnInfo = document.createElement('button');
       btnInfo.type = 'button';
       btnInfo.style.cssText = 'flex:1; text-align:left; padding:12px 14px; border:none; background:none; font-family:var(--body); font-size:14.5px; color:var(--ink); cursor:pointer;';
-      const registroSemana = registroHechoEsteDia(c.nombre, d);
+      const registroSemana = registroHechoEsteDia(c.nombre, c.direccion, d);
       let check = '';
       if(registroSemana){
         const esOk = registroSemana.resultado === 'Se limpió y se desagotó';

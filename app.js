@@ -212,11 +212,21 @@ function renderClientSelect(){
   // si el cliente elegido ya no existe (se quitó, o se recargó la lista), lo soltamos
   if(selectedClientIndex != null && !clients[selectedClientIndex]) selectedClientIndex = null;
 
+  const searchInput = document.getElementById('accordionSearchInput');
+  const filtro = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
   const grupos = {};
   DIAS_CANON.concat(['Otros']).forEach(d => grupos[d] = []);
   clients.forEach((c, i)=>{
+    if(filtro && !c.nombre.toLowerCase().includes(filtro)) return;
     diasDeCliente(c).forEach(d => grupos[d].push(i));
   });
+
+  const hayResultados = DIAS_CANON.concat(['Otros']).some(d => grupos[d].length > 0);
+  if(filtro && !hayResultados){
+    wrap.innerHTML = '<div class="empty" style="padding:16px 0;">Ningún cliente coincide con esa búsqueda.</div>';
+    return;
+  }
 
   // Dentro de "Otros / Empresas con reserva", ordenamos por fecha de inicio:
   // primero la más próxima, al final los que no tienen fecha cargada todavía.
@@ -241,14 +251,14 @@ function renderClientSelect(){
     const label = document.createElement('span');
     label.textContent = (d === 'Otros' ? 'Otros / Empresas con reserva' : d) + ` (${grupos[d].length})`;
     const arrow = document.createElement('span');
-    arrow.textContent = '▾';
+    arrow.textContent = filtro ? '▴' : '▾';
     arrow.className = 'acc-arrow';
     header.appendChild(label);
     header.appendChild(arrow);
 
     const body = document.createElement('div');
     body.className = 'acc-body';
-    body.style.cssText = 'display:none; background:#fff;';
+    body.style.cssText = 'display:' + (filtro ? 'block' : 'none') + '; background:#fff;';
 
     grupos[d].forEach(i=>{
       const c = clients[i];
@@ -367,7 +377,12 @@ function renderClientSelect(){
 function crearFilaCliente(c, i, grupo){
   const div = document.createElement('div');
   div.className = 'client-chip';
-  const label = c.direccion ? `${escapeHtml(c.nombre)} <span style="color:#8A9793;">— ${escapeHtml(c.direccion)}</span>` : escapeHtml(c.nombre);
+  let marcaTexto = '';
+  if(c.marcaRetiro === 'rojo') marcaTexto = ' <span style="color:#B4432B; font-weight:700; font-size:12px;">🔴 Marcado para retirar</span>';
+  else if(c.marcaRetiro === 'amarillo') marcaTexto = ' <span style="color:#A98600; font-weight:700; font-size:12px;">🟡 Marcado para retirar</span>';
+  const label = (c.direccion
+    ? `${escapeHtml(c.nombre)} <span style="color:#8A9793;">— ${escapeHtml(c.direccion)}</span>`
+    : escapeHtml(c.nombre)) + marcaTexto;
   const nombreLine = document.createElement('div');
   nombreLine.innerHTML = label;
   div.appendChild(nombreLine);
@@ -438,6 +453,7 @@ function crearFilaCliente(c, i, grupo){
       <option value="amarillo">🟡 Amarillo (retirar)</option>
       <option value="blanco">⚪ Quitar marca</option>
     `;
+    if(c.marcaRetiro) selectColor.value = c.marcaRetiro;
 
     const btnAplicar = document.createElement('button');
     btnAplicar.textContent = 'Aplicar';
@@ -458,8 +474,10 @@ function crearFilaCliente(c, i, grupo){
       btnAplicar.disabled = true;
       try{
         await backendPost({ action:'marcarClienteParaRetirar', nombre: c.nombre, direccion: c.direccion || '', color, fechaTexto });
+        c.marcaRetiro = (color === 'blanco') ? '' : color;
         setStatus(color === 'blanco' ? ('Se sacó la marca de ' + c.nombre) : ('Marcado (' + color + '): ' + c.nombre), 'ok');
-        selectColor.value = '';
+        renderClientList();
+        return; // ya se volvió a dibujar todo, no hace falta tocar más este botón
       }catch(err){
         setStatus('No se pudo marcar: ' + err.message, 'err');
       }
@@ -476,9 +494,12 @@ function crearFilaCliente(c, i, grupo){
 }
 
 function renderClientList(){
-  const wrap = document.getElementById('clientList');
+  const wrap = document.getElementById('clientListResults');
   if(!wrap) return; // esta lista no existe en la versión de empleado
   wrap.innerHTML = '';
+
+  const searchInput = document.getElementById('clientListSearchInput');
+  const filtro = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
   if(clients.length === 0){
     wrap.innerHTML = '<div class="empty" style="padding:16px 0;">Todavía no hay clientes cargados.</div>';
@@ -488,8 +509,15 @@ function renderClientList(){
   const grupos = {};
   DIAS_CANON.concat(['Otros']).forEach(d => grupos[d] = []);
   clients.forEach((c, i)=>{
+    if(filtro && !c.nombre.toLowerCase().includes(filtro)) return;
     diasDeCliente(c).forEach(d => grupos[d].push(i));
   });
+
+  const hayResultados = DIAS_CANON.concat(['Otros']).some(d => grupos[d].length > 0);
+  if(filtro && !hayResultados){
+    wrap.innerHTML = '<div class="empty" style="padding:16px 0;">Ningún cliente coincide con esa búsqueda.</div>';
+    return;
+  }
 
   DIAS_CANON.concat(['Otros']).forEach(d=>{
     if(grupos[d].length === 0) return;
@@ -503,14 +531,14 @@ function renderClientList(){
     const label = document.createElement('span');
     label.textContent = (d === 'Otros' ? 'Otros / Empresas con reserva' : d) + ` (${grupos[d].length})`;
     const arrow = document.createElement('span');
-    arrow.textContent = '▾';
+    arrow.textContent = filtro ? '▴' : '▾';
     arrow.className = 'acc-arrow-list';
     header.appendChild(label);
     header.appendChild(arrow);
 
     const body = document.createElement('div');
     body.className = 'acc-body-list';
-    body.style.cssText = 'display:none; background:#fff; padding:8px;';
+    body.style.cssText = 'background:#fff; padding:8px; display:' + (filtro ? 'block' : 'none') + ';';
 
     grupos[d].forEach(i=>{
       body.appendChild(crearFilaCliente(clients[i], i, d));
@@ -526,6 +554,14 @@ function renderClientList(){
     section.appendChild(body);
     wrap.appendChild(section);
   });
+}
+
+if(document.getElementById('clientListSearchInput')){
+  document.getElementById('clientListSearchInput').oninput = ()=> renderClientList();
+}
+
+if(document.getElementById('accordionSearchInput')){
+  document.getElementById('accordionSearchInput').oninput = ()=> renderClientSelect();
 }
 
 if(document.getElementById('toggleClientListBtn')){

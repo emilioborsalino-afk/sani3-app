@@ -255,6 +255,7 @@
   <div class="section-label">Cliente</div>
   <div class="card">
     <div id="selectedClientLabel" style="font-family:var(--disp); font-weight:700; font-size:15px; color:#8A9793; margin-bottom:10px;">Ningún cliente elegido todavía</div>
+    <input class="client-input" id="accordionSearchInput" placeholder="🔎 Buscar cliente..." style="width:100%; box-sizing:border-box; margin-bottom:8px;">
     <div id="clientAccordion"></div>
     <div class="row" style="margin-top:14px;">
       <input class="client-input" id="newClientInput" placeholder="Nombre (solo si no está en la lista)">
@@ -284,7 +285,10 @@
     <button class="btn-small" id="addClientBtn" style="width:100%; margin-top:10px;">Agregar</button>
     <div class="solo-dueno">
       <button id="toggleClientListBtn" style="width:100%; margin-top:10px; background:none; color:var(--teal); font-family:var(--body); font-weight:600; font-size:13px; padding:8px;">Ver lista completa de clientes</button>
-      <div id="clientList" style="display:none;"></div>
+      <div id="clientList" style="display:none;">
+        <input class="client-input" id="clientListSearchInput" placeholder="🔎 Buscar por nombre..." style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+        <div id="clientListResults"></div>
+      </div>
     </div>
   </div>
 
@@ -339,7 +343,7 @@
 </div>
 
 <script>window.MODO_EMPLEADO = false;</script>
-<script src="app.js?v=17"></script>
+<script src="app.js?v=18"></script>
 
 </body>
 </html>

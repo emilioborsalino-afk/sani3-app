@@ -152,20 +152,29 @@ function inicioSemanaActual(){
 
 const DIA_INDEX = { 'Domingo':0, 'Lunes':1, 'Martes':2, 'Miercoles':3, 'Jueves':4, 'Viernes':5, 'Sabado':6 };
 
-function registroHechoEsteDia(nombreCliente, direccionCliente, diaCanon){
+function registroHechoEsteDia(c, diaCanon){
   const inicio = inicioSemanaActual();
   if(diaCanon === 'Otros') return null; // "Otros" no tiene día fijo, no aplica el check
-  const direccionNorm = (direccionCliente || '').trim().toLowerCase();
-  // Buscamos el registro más nuevo de este cliente en lo que va de la semana,
-  // sin importar en qué día exacto se haya hecho (a veces se adelanta o atrasa
-  // respecto al día que tiene asignado, y de todas formas cuenta como hecho).
+  const direccionNorm = (c.direccion || '').trim().toLowerCase();
+  const diasDelCliente = diasDeCliente(c);
+  const esMultiDia = diasDelCliente.length > 1; // ej: "Lunes, Miércoles y Viernes"
+  const idxEsperado = DIA_INDEX[diaCanon];
   // Comparamos nombre Y dirección, para no confundir a dos clientes homónimos
   // que viven en lugares distintos (por ejemplo, dos "Maurino Paula" distintas).
   return records.find(r=>{
-    if(r.cliente !== nombreCliente) return false;
+    if(r.cliente !== c.nombre) return false;
     if((r.direccion || '').trim().toLowerCase() !== direccionNorm) return false;
     const f = new Date(r.fechaISO);
-    return f >= inicio;
+    if(f < inicio) return false;
+    if(esMultiDia){
+      // Cliente con varios días por semana: cada día se controla por separado,
+      // con el día exacto (si le toca lunes/miércoles/viernes, marcar el lunes
+      // no debe marcar también miércoles y viernes).
+      return idxEsperado != null && f.getDay() === idxEsperado;
+    }
+    // Cliente de un solo día: alcanza con que se haya hecho esta semana,
+    // sin importar si se adelantó o atrasó respecto al día asignado.
+    return true;
   }) || null;
 }
 
@@ -274,7 +283,7 @@ function renderClientSelect(){
       const btnInfo = document.createElement('button');
       btnInfo.type = 'button';
       btnInfo.style.cssText = 'flex:1; text-align:left; padding:12px 14px; border:none; background:none; font-family:var(--body); font-size:14.5px; color:var(--ink); cursor:pointer;';
-      const registroSemana = registroHechoEsteDia(c.nombre, c.direccion, d);
+      const registroSemana = registroHechoEsteDia(c, d);
       let check = '';
       if(registroSemana){
         const esOk = registroSemana.resultado === 'Se limpió y se desagotó';

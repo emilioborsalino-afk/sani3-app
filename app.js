@@ -378,17 +378,19 @@ function crearFilaCliente(c, i, grupo){
   const div = document.createElement('div');
   div.className = 'client-chip';
   let marcaTexto = '';
-  if(c.marcaRetiro){
+  if(grupo === 'Otros'){
+    // Acá solo color (verde/amarillo) y fecha de inicio — nunca "Retirar", aunque el cliente
+    // tenga esa nota vieja en Observaciones de antes de separar los dos sistemas.
+    if(c.colorReserva === 'amarillo') marcaTexto += ' 🟡';
+    else if(c.colorReserva === 'verde') marcaTexto += ' 🟢';
+    if(c.fechaInicio) marcaTexto += ` <span style="color:#8A9793; font-size:12px;">Inicio: ${escapeHtml(formatFechaCorta(c.fechaInicio))}</span>`;
+  } else if(c.marcaRetiro){
     // Buscamos el pedacito de la observación que empieza con "Retirar", para mostrar la fecha real puesta ahí.
     const partesObs = (c.observacion || '').split('|').map(p => p.trim());
     const notaRetirar = partesObs.find(p => p.toLowerCase().indexOf('retirar') === 0) || 'Retirar';
     const icono = c.marcaRetiro === 'rojo' ? '🔴' : (c.marcaRetiro === 'amarillo' ? '🟡' : '🟠');
     const color = c.marcaRetiro === 'rojo' ? '#B4432B' : (c.marcaRetiro === 'amarillo' ? '#A98600' : '#B5711A');
     marcaTexto = ` <span style="color:${color}; font-weight:700; font-size:12px;">${icono} ${escapeHtml(notaRetirar)}</span>`;
-  } else if(c.colorReserva === 'amarillo'){
-    marcaTexto = ' 🟡';
-  } else if(c.colorReserva === 'verde'){
-    marcaTexto = ' 🟢';
   }
   const label = (c.direccion
     ? `${escapeHtml(c.nombre)} <span style="color:#8A9793;">— ${escapeHtml(c.direccion)}</span>`

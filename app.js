@@ -364,7 +364,7 @@ function renderClientSelect(){
 }
 
 
-function crearFilaCliente(c, i){
+function crearFilaCliente(c, i, grupo){
   const div = document.createElement('div');
   div.className = 'client-chip';
   const label = c.direccion ? `${escapeHtml(c.nombre)} <span style="color:#8A9793;">— ${escapeHtml(c.direccion)}</span>` : escapeHtml(c.nombre);
@@ -405,23 +405,51 @@ function crearFilaCliente(c, i){
     }
   };
 
-  const btnQuitar = document.createElement('button');
-  btnQuitar.textContent = 'Quitar';
-  btnQuitar.onclick = async ()=>{
-    const ok = confirm('¿Seguro que querés quitar a "' + c.nombre + '" de la lista de clientes?');
-    if(!ok) return;
-    try{
-      await backendPost({ action:'deleteClient', nombre: c.nombre, direccion: c.direccion || '' });
-      const idx = clients.indexOf(c);
-      if(idx !== -1) clients.splice(idx,1);
-      renderClientSelect();
-      renderClientList();
-      setStatus('Cliente quitado: ' + c.nombre, 'ok');
-    }catch(err){ setStatus('No se pudo quitar: ' + err.message, 'err'); }
-  };
-
   acciones.appendChild(btnLink);
-  acciones.appendChild(btnQuitar);
+
+  if(grupo === 'Otros'){
+    // Clientes en "Empresas con reserva": acá sí se borran de verdad, con confirmación.
+    const btnQuitar = document.createElement('button');
+    btnQuitar.textContent = 'Quitar';
+    btnQuitar.style.cssText = 'background:none; color:#C0392B; font-family:var(--body); font-weight:600; font-size:13px; padding:2px;';
+    btnQuitar.onclick = async ()=>{
+      const ok = confirm('¿Seguro que querés quitar a "' + c.nombre + '"? Se borra también de la planilla, no se puede deshacer.');
+      if(!ok) return;
+      try{
+        await backendPost({ action:'deleteClient', nombre: c.nombre, direccion: c.direccion || '' });
+        const idx = clients.indexOf(c);
+        if(idx !== -1) clients.splice(idx,1);
+        renderClientSelect();
+        renderClientList();
+        setStatus('Cliente quitado: ' + c.nombre, 'ok');
+      }catch(err){ setStatus('No se pudo quitar: ' + err.message, 'err'); }
+    };
+    acciones.appendChild(btnQuitar);
+  } else {
+    // Clientes activos (Lunes a Sábado): en vez de borrar, se marca la fila
+    // para retirar (color + nota en Observaciones), sin perder nada de la planilla.
+    const btnRetirar = document.createElement('button');
+    btnRetirar.textContent = '🟠 Marcar para retirar';
+    btnRetirar.style.cssText = 'background:none; color:#B5711A; font-family:var(--body); font-weight:600; font-size:13px; padding:2px;';
+    btnRetirar.onclick = async ()=>{
+      const fechaTexto = prompt('¿Para cuándo hay que retirar el baño de "' + c.nombre + '"? (podés escribirla como quieras, por ejemplo: 24/7/26). Dejá vacío si todavía no sabés la fecha.', '');
+      if(fechaTexto === null) return; // canceló
+      const textoOriginal = btnRetirar.textContent;
+      btnRetirar.textContent = 'Marcando...';
+      btnRetirar.disabled = true;
+      try{
+        await backendPost({ action:'marcarClienteParaRetirar', nombre: c.nombre, direccion: c.direccion || '', fechaTexto });
+        setStatus('Marcado para retirar: ' + c.nombre + '. Se anotó en la planilla.', 'ok');
+        btnRetirar.textContent = '✓ Marcado';
+      }catch(err){
+        setStatus('No se pudo marcar: ' + err.message, 'err');
+        btnRetirar.textContent = textoOriginal;
+        btnRetirar.disabled = false;
+      }
+    };
+    acciones.appendChild(btnRetirar);
+  }
+
   div.appendChild(acciones);
   return div;
 }
@@ -464,7 +492,7 @@ function renderClientList(){
     body.style.cssText = 'display:none; background:#fff; padding:8px;';
 
     grupos[d].forEach(i=>{
-      body.appendChild(crearFilaCliente(clients[i], i));
+      body.appendChild(crearFilaCliente(clients[i], i, d));
     });
 
     header.onclick = ()=>{

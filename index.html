@@ -146,13 +146,16 @@
   .status-line.err{color:#B4432B;}
 
   .client-chip{
-    display:flex; align-items:center; justify-content:space-between;
+    display:flex; flex-direction:column; gap:8px;
     background:#fff; border:1px solid var(--line); border-radius:8px;
-    padding:9px 12px; margin-top:8px; font-size:14.5px;
+    padding:10px 12px; margin-top:8px; font-size:14.5px;
+  }
+  .client-chip-acciones{
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
   }
   .client-chip button{
     background:none; color:#B4432B; font-family:var(--body); font-weight:600;
-    font-size:13px; padding:2px;
+    font-size:13px; padding:3px 2px;
   }
 
   .ticket{
@@ -336,7 +339,7 @@
 </div>
 
 <script>window.MODO_EMPLEADO = false;</script>
-<script src="app.js?v=16"></script>
+<script src="app.js?v=17"></script>
 
 </body>
 </html>

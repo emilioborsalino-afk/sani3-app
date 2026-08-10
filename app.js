@@ -368,14 +368,16 @@ function crearFilaCliente(c, i, grupo){
   const div = document.createElement('div');
   div.className = 'client-chip';
   const label = c.direccion ? `${escapeHtml(c.nombre)} <span style="color:#8A9793;">— ${escapeHtml(c.direccion)}</span>` : escapeHtml(c.nombre);
-  div.innerHTML = `<span>${label}</span>`;
+  const nombreLine = document.createElement('div');
+  nombreLine.innerHTML = label;
+  div.appendChild(nombreLine);
 
   const acciones = document.createElement('div');
-  acciones.style.cssText = 'display:flex; gap:10px; align-items:center; flex-shrink:0;';
+  acciones.className = 'client-chip-acciones';
 
   const btnLink = document.createElement('button');
   btnLink.textContent = 'Copiar link';
-  btnLink.style.cssText = 'background:none; color:#B5711A; font-family:var(--body); font-weight:600; font-size:13px; padding:2px;';
+  btnLink.style.color = '#B5711A';
   btnLink.onclick = async ()=>{
     const url = new URL('cliente.html', location.href);
     const tieneHuellaEstable = c.fechaInicio && c.telefono;
@@ -404,14 +406,13 @@ function crearFilaCliente(c, i, grupo){
       prompt('Copiá este link a mano:', url.toString());
     }
   };
-
   acciones.appendChild(btnLink);
 
   if(grupo === 'Otros'){
     // Clientes en "Empresas con reserva": acá sí se borran de verdad, con confirmación.
     const btnQuitar = document.createElement('button');
     btnQuitar.textContent = 'Quitar';
-    btnQuitar.style.cssText = 'background:none; color:#C0392B; font-family:var(--body); font-weight:600; font-size:13px; padding:2px;';
+    btnQuitar.style.color = '#C0392B';
     btnQuitar.onclick = async ()=>{
       const ok = confirm('¿Seguro que querés quitar a "' + c.nombre + '"? Se borra también de la planilla, no se puede deshacer.');
       if(!ok) return;
@@ -427,27 +428,47 @@ function crearFilaCliente(c, i, grupo){
     acciones.appendChild(btnQuitar);
   } else {
     // Clientes activos (Lunes a Sábado): en vez de borrar, se marca la fila
-    // para retirar (color + nota en Observaciones), sin perder nada de la planilla.
-    const btnRetirar = document.createElement('button');
-    btnRetirar.textContent = '🟠 Marcar para retirar';
-    btnRetirar.style.cssText = 'background:none; color:#B5711A; font-family:var(--body); font-weight:600; font-size:13px; padding:2px;';
-    btnRetirar.onclick = async ()=>{
-      const fechaTexto = prompt('¿Para cuándo hay que retirar el baño de "' + c.nombre + '"? (podés escribirla como quieras, por ejemplo: 24/7/26). Dejá vacío si todavía no sabés la fecha.', '');
-      if(fechaTexto === null) return; // canceló
-      const textoOriginal = btnRetirar.textContent;
-      btnRetirar.textContent = 'Marcando...';
-      btnRetirar.disabled = true;
+    // de un color (o se limpia todo), sin perder nada de la planilla.
+    const selectColor = document.createElement('select');
+    selectColor.className = 'client-input';
+    selectColor.style.cssText = 'font-size:13px; padding:5px 6px; max-width:190px;';
+    selectColor.innerHTML = `
+      <option value="">Marcar...</option>
+      <option value="rojo">🔴 Rojo (retirar)</option>
+      <option value="amarillo">🟡 Amarillo (retirar)</option>
+      <option value="blanco">⚪ Quitar marca</option>
+    `;
+
+    const btnAplicar = document.createElement('button');
+    btnAplicar.textContent = 'Aplicar';
+    btnAplicar.style.color = '#B5711A';
+    btnAplicar.onclick = async ()=>{
+      const color = selectColor.value;
+      if(!color){
+        setStatus('Elegí primero una opción del desplegable.', 'err');
+        return;
+      }
+      let fechaTexto = '';
+      if(color !== 'blanco'){
+        fechaTexto = prompt('¿Para cuándo hay que retirar el baño de "' + c.nombre + '"? (podés escribirla como quieras, por ejemplo: 24/7/26). Dejá vacío si todavía no sabés la fecha.', '');
+        if(fechaTexto === null) return; // canceló
+      }
+      const textoOriginal = btnAplicar.textContent;
+      btnAplicar.textContent = 'Aplicando...';
+      btnAplicar.disabled = true;
       try{
-        await backendPost({ action:'marcarClienteParaRetirar', nombre: c.nombre, direccion: c.direccion || '', fechaTexto });
-        setStatus('Marcado para retirar: ' + c.nombre + '. Se anotó en la planilla.', 'ok');
-        btnRetirar.textContent = '✓ Marcado';
+        await backendPost({ action:'marcarClienteParaRetirar', nombre: c.nombre, direccion: c.direccion || '', color, fechaTexto });
+        setStatus(color === 'blanco' ? ('Se sacó la marca de ' + c.nombre) : ('Marcado (' + color + '): ' + c.nombre), 'ok');
+        selectColor.value = '';
       }catch(err){
         setStatus('No se pudo marcar: ' + err.message, 'err');
-        btnRetirar.textContent = textoOriginal;
-        btnRetirar.disabled = false;
       }
+      btnAplicar.textContent = textoOriginal;
+      btnAplicar.disabled = false;
     };
-    acciones.appendChild(btnRetirar);
+
+    acciones.appendChild(selectColor);
+    acciones.appendChild(btnAplicar);
   }
 
   div.appendChild(acciones);

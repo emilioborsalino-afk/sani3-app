@@ -148,44 +148,29 @@ function cargarJSONP(url){
 
 async function cargar(){
   const params = new URLSearchParams(location.search);
-  const token = (params.get('t') || '').trim();
-  const nombreLegacy = (params.get('nombre') || '').trim(); // formato viejo, para que los links ya enviados sigan andando
+  const nombre = (params.get('nombre') || '').trim();
   const main = document.getElementById('main');
 
-  if(!token && !nombreLegacy){
+  if(!nombre){
     document.getElementById('clienteNombre').textContent = 'Link incompleto';
-    main.innerHTML = '<div class="error">Este link no es válido. Pedile a Sani3 que te reenvíe el link correcto.</div>';
+    main.innerHTML = '<div class="error">Este link no incluye tu nombre. Pedile a Sani3 que te reenvíe el link correcto.</div>';
     return;
   }
 
-  document.getElementById('clienteNombre').textContent = 'Cargando...';
+  document.getElementById('clienteNombre').textContent = nombre.split('|')[0] || 'Mi historial';
 
   try{
-    let nombreMostrar, records;
-
-    if(token){
-      const url = BACKEND_URL + '?action=recordsForToken&t=' + encodeURIComponent(token);
-      const resp = await cargarJSONP(url);
-      if(resp && resp.error) throw new Error(resp.error);
-      nombreMostrar = resp.nombre || 'Mi historial';
-      records = resp.records || [];
-    } else {
-      // Formato viejo (link ya enviado antes de tener códigos): nombre + dirección + fecha + teléfono a la vista.
-      const direccion = params.get('direccion') || '';
-      const fechaInicio = params.get('fechaInicio') || '';
-      const telefono = params.get('telefono') || '';
-      const url = BACKEND_URL + '?action=recordsFor'
-        + '&cliente=' + encodeURIComponent(nombreLegacy)
-        + '&direccion=' + encodeURIComponent(direccion)
-        + '&fechaInicio=' + encodeURIComponent(fechaInicio)
-        + '&telefono=' + encodeURIComponent(telefono);
-      const resp = await cargarJSONP(url);
-      if(resp && resp.error) throw new Error(resp.error);
-      nombreMostrar = nombreLegacy.split('|')[0] || 'Mi historial';
-      records = resp || [];
-    }
-
-    document.getElementById('clienteNombre').textContent = nombreMostrar;
+    const direccion = params.get('direccion') || '';
+    const fechaInicio = params.get('fechaInicio') || '';
+    const telefono = params.get('telefono') || '';
+    const url = BACKEND_URL + '?action=recordsFor'
+      + '&cliente=' + encodeURIComponent(nombre)
+      + '&direccion=' + encodeURIComponent(direccion)
+      + '&fechaInicio=' + encodeURIComponent(fechaInicio)
+      + '&telefono=' + encodeURIComponent(telefono);
+    const resp = await cargarJSONP(url);
+    if(resp && resp.error) throw new Error(resp.error);
+    const records = resp || [];
 
     if(!records || records.length === 0){
       main.innerHTML = '<div class="empty">Todavía no hay servicios registrados a tu nombre.</div>';

@@ -420,7 +420,6 @@ function crearFilaCliente(c, i, grupo){
   btnLink.textContent = 'Copiar link';
   btnLink.style.color = '#B5711A';
   btnLink.onclick = async ()=>{
-    const url = new URL('cliente.html', location.href);
     const tieneHuellaEstable = c.fechaInicio && c.telefono;
 
     let nombres = [c.nombre];
@@ -435,17 +434,32 @@ function crearFilaCliente(c, i, grupo){
       nombres = nombres.concat(anteriores.split(',').map(n=>n.trim()).filter(Boolean));
     }
 
-    url.searchParams.set('nombre', nombres.join('|'));
-    if(c.direccion) url.searchParams.set('direccion', c.direccion);
-    if(c.fechaInicio) url.searchParams.set('fechaInicio', c.fechaInicio);
-    if(c.telefono) url.searchParams.set('telefono', c.telefono);
-
+    const textoOriginal = btnLink.textContent;
+    btnLink.textContent = 'Generando link...';
+    btnLink.disabled = true;
     try{
+      const params = new URLSearchParams();
+      params.set('action', 'tokenParaCliente');
+      params.set('nombres', nombres.join('|'));
+      if(c.direccion) params.set('direccion', c.direccion);
+      if(c.fechaInicio) params.set('fechaInicio', c.fechaInicio);
+      if(c.telefono) params.set('telefono', c.telefono);
+      const res = await fetch(backendUrl + '?' + params.toString());
+      const resp = await res.json();
+      if(resp && resp.error) throw new Error(resp.error);
+      if(!resp || !resp.token) throw new Error('no se pudo generar el código');
+
+      const url = new URL('cliente.html', location.href);
+      url.searchParams.set('t', resp.token);
+
       await navigator.clipboard.writeText(url.toString());
       setStatus('Link de ' + c.nombre + ' copiado. Pegalo en WhatsApp para mandárselo.', 'ok');
     }catch(err){
-      prompt('Copiá este link a mano:', url.toString());
+      setStatus('No se pudo generar el link: ' + err.message, 'err');
     }
+    btnLink.textContent = textoOriginal;
+    btnLink.disabled = false;
+  };
   };
   acciones.appendChild(btnLink);
 

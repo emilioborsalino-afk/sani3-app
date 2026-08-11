@@ -1339,7 +1339,13 @@ function renderHistory(){
       if(!file){ return; }
       nombreSpan.textContent = 'Procesando foto...';
       try{
-        const dataUrl = await resizeImage(file, 1280, 0.82, []);
+        const rec = records.find(r=>r.id===id);
+        const now = new Date();
+        const stampText = [
+          rec ? rec.cliente : '',
+          now.toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'numeric'}) + '  ' + formatTime(now)
+        ].filter(Boolean);
+        const dataUrl = await resizeImage(file, 1280, 0.82, stampText);
         obsFotosTemp[id] = dataUrl;
         nombreSpan.textContent = '✓ Foto lista para guardar';
         nombreSpan.style.color = 'var(--green)';

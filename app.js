@@ -1122,7 +1122,7 @@ function mostrarSelectorCliente(nombreActual, direccionActual){
         item.innerHTML = `<div style="font-weight:600;">${escapeHtml(c.nombre)}</div>${c.direccion ? `<div style="font-size:11.5px; color:#8A9793;">${escapeHtml(c.direccion)}</div>` : ''}`;
         item.onclick = ()=>{
           const confirmado = confirm(`¿Cambiar "${nombreActual || '(sin nombre)'}" por "${c.nombre}"?`);
-          if(confirmado) cerrar({ nombre: c.nombre, direccion: c.direccion || '' });
+          if(confirmado) cerrar({ nombre: c.nombre, direccion: c.direccion || '', fechaInicio: c.fechaInicio || '', telefono: c.telefono || '' });
         };
         listaEl.appendChild(item);
       });
@@ -1261,10 +1261,12 @@ function renderHistory(){
       btn.innerHTML = '<span class="ticket-client">Guardando...</span>';
       btn.disabled = true;
       try{
-        const resp = await backendPost({ action:'actualizarClienteRegistro', id, nombre: seleccion.nombre, direccion: seleccion.direccion });
+        const resp = await backendPost({ action:'actualizarClienteRegistro', id, nombre: seleccion.nombre, direccion: seleccion.direccion, fechaInicioCliente: seleccion.fechaInicio, telefonoCliente: seleccion.telefono });
         if(resp.error) throw new Error(resp.error);
         rec.cliente = seleccion.nombre;
         rec.direccion = seleccion.direccion;
+        rec.fechaInicioCliente = seleccion.fechaInicio || '';
+        rec.telefonoCliente = seleccion.telefono || '';
         renderHistory();
         setStatus('Nombre/dirección corregidos para este servicio.', 'ok');
       }catch(err){

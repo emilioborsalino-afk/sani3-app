@@ -170,27 +170,36 @@ window.addEventListener('unhandledrejection', (e)=>{
 
 // ---------- Llamadas al backend (Google Apps Script) ----------
 
+function cargarJSONP(url){
+  return new Promise((resolve, reject)=>{
+    const cbName = 'jsonp_cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+    const timer = setTimeout(()=>{ limpiar(); reject(new Error('se agotó el tiempo de espera')); }, 12000);
+    function limpiar(){
+      clearTimeout(timer);
+      delete window[cbName];
+      script.remove();
+    }
+    window[cbName] = (data)=>{ limpiar(); resolve(data); };
+    script.onerror = ()=>{ limpiar(); reject(new Error('no se pudo conectar al servidor')); };
+    script.src = url + (url.indexOf('?') > -1 ? '&' : '?') + 'callback=' + cbName;
+    document.body.appendChild(script);
+  });
+}
+
 async function backendGet(action){
   if(!backendUrl) throw new Error('Todavía no conectaste el backend (pegá la URL arriba).');
   const url = backendUrl + '?action=' + encodeURIComponent(action) + '&_=' + Date.now();
-  const intentar = async ()=>{
-    const res = await fetch(url, { cache: 'no-store' });
-    const texto = await res.text();
-    let data;
-    try{
-      data = JSON.parse(texto);
-    }catch(errParse){
-      throw new Error('Google no devolvió una respuesta válida en este intento (suele ser un bache pasajero). Probá de nuevo en unos segundos.');
-    }
+  try{
+    const data = await cargarJSONP(url);
     if(data && data.error) throw new Error(data.error);
     return data;
-  };
-  try{
-    return await intentar();
   }catch(err){
     // Reintentamos una vez más antes de rendirnos, por si fue un bache de un solo instante.
     await new Promise(r => setTimeout(r, 1200));
-    return await intentar();
+    const data2 = await cargarJSONP(url);
+    if(data2 && data2.error) throw new Error(data2.error);
+    return data2;
   }
 }
 async function backendPost(payload){

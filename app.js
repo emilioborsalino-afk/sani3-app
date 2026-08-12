@@ -14,6 +14,130 @@ let ubicacionActualHora = null;  // Date de cuándo se consiguió
 
 const CLIENTES_PRECARGADOS = []; // ya no se usa: los clientes se leen en vivo desde Registro Alquileres
 
+// ---------- Trabajar sin conexión: caché local + fotos pendientes de subir ----------
+const CLIENTS_CACHE_KEY = 'sani3_clients_cache';
+const RECORDS_CACHE_KEY = 'sani3_records_cache';
+const PENDING_KEY = 'sani3_pending_queue';
+
+function guardarCacheLocal(){
+  try{
+    localStorage.setItem(CLIENTS_CACHE_KEY, JSON.stringify({ clients, guardadoEn: new Date().toISOString() }));
+    localStorage.setItem(RECORDS_CACHE_KEY, JSON.stringify({ records, guardadoEn: new Date().toISOString() }));
+  }catch(err){ /* si no entra en el almacenamiento del celular, no pasa nada grave */ }
+}
+
+// Trae la última copia guardada en el celular (clientes + historial). Devuelve
+// la fecha/hora de esa copia como texto, o null si nunca se guardó ninguna.
+function cargarCacheLocal(){
+  try{
+    const clientesGuardados = localStorage.getItem(CLIENTS_CACHE_KEY);
+    if(!clientesGuardados) return null;
+    const parsedClientes = JSON.parse(clientesGuardados);
+    clients = parsedClientes.clients || [];
+    const registrosGuardados = localStorage.getItem(RECORDS_CACHE_KEY);
+    if(registrosGuardados){
+      records = JSON.parse(registrosGuardados).records || [];
+    }
+    const fecha = new Date(parsedClientes.guardadoEn);
+    return fecha.toLocaleDateString('es-AR') + ' ' + fecha.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+  }catch(err){
+    return null;
+  }
+}
+
+function obtenerPendientes(){
+  try{ return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); }
+  catch(err){ return []; }
+}
+function guardarListaPendientes(lista){
+  try{ localStorage.setItem(PENDING_KEY, JSON.stringify(lista)); }
+  catch(err){ setStatus('Ojo: no se pudo guardar la foto pendiente en el celular (puede que esté sin espacio).', 'err'); }
+}
+function agregarPendiente(payload){
+  const lista = obtenerPendientes();
+  lista.push(payload);
+  guardarListaPendientes(lista);
+  renderPendientesBadge();
+}
+function quitarPendiente(id){
+  const lista = obtenerPendientes().filter(p => p.id !== id);
+  guardarListaPendientes(lista);
+  renderPendientesBadge();
+}
+function renderPendientesBadge(){
+  const el = document.getElementById('pendientesBadge');
+  if(!el) return;
+  const cantidad = obtenerPendientes().length;
+  if(cantidad > 0){
+    el.style.display = 'block';
+    el.textContent = '⏳ ' + cantidad + (cantidad === 1 ? ' foto pendiente de subir' : ' fotos pendientes de subir') + ' — se suben solas cuando vuelva la conexión.';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+// Mete en "records" (para que se vean en el historial ya mismo) las fotos que
+// quedaron pendientes de subir, marcadas con "pendiente: true", sin duplicar
+// las que ya estén ahí.
+function fusionarPendientesEnRecords(){
+  const pendientes = obtenerPendientes();
+  pendientes.forEach(p => {
+    if(records.some(r => r.id === p.id)) return;
+    records.unshift({
+      id: p.id,
+      cliente: p.cliente,
+      direccion: p.direccion || '',
+      telefono: p.telefonoCliente || '',
+      fechaISO: p.fechaISO,
+      foto: p.fotoBase64 || '',
+      lat: p.lat, lon: p.lon,
+      ubicacionManual: p.ubicacionManual || '',
+      resultado: p.resultado || '',
+      observacion: '',
+      fotoObservacion: '',
+      pendiente: true
+    });
+  });
+  records.sort((a, b) => new Date(b.fechaISO) - new Date(a.fechaISO));
+}
+
+// Intenta subir, una por una, las fotos que quedaron guardadas en el celular
+// mientras no había conexión. Si alguna falla (sigue sin conexión), corta ahí
+// y deja el resto para el próximo intento — no hace falta que el usuario haga nada,
+// se llama sola cada vez que hay conexión (al conectar, actualizar, o apenas
+// el celular recupera señal).
+let subiendoPendientes = false;
+async function reintentarPendientes(){
+  if(subiendoPendientes) return; // evita que se pisen dos intentos al mismo tiempo
+  const lista = obtenerPendientes();
+  if(lista.length === 0) return;
+  subiendoPendientes = true;
+  setStatus('Subiendo ' + lista.length + (lista.length === 1 ? ' foto pendiente...' : ' fotos pendientes...'));
+  let subidas = 0;
+  for(const payload of lista){
+    try{
+      const resp = await backendPost(payload);
+      quitarPendiente(payload.id);
+      const rec = records.find(r => r.id === payload.id);
+      if(rec){
+        rec.pendiente = false;
+        if(resp.fotoUrl) rec.foto = resp.fotoUrl;
+      }
+      subidas++;
+    }catch(err){
+      break; // probablemente sigue sin conexión: dejamos el resto para más adelante
+    }
+  }
+  subiendoPendientes = false;
+  renderHistory();
+  renderPendientesBadge();
+  if(subidas > 0){
+    const restantes = obtenerPendientes().length;
+    setStatus(restantes === 0 ? 'Todo sincronizado ✓' : ('Se subieron ' + subidas + ', quedan ' + restantes + ' pendientes.'), 'ok');
+  }
+}
+window.addEventListener('online', reintentarPendientes);
+
 function todayLabel(){
   const d = new Date();
   document.getElementById('todayLabel').textContent = d.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
@@ -69,9 +193,12 @@ async function loadAll(){
   document.getElementById('companyName').value = config.companyName || '';
   if(!backendUrl){
     setConnDot(false);
+    cargarCacheLocal();
+    fusionarPendientesEnRecords();
     renderClientSelect();
     renderClientList();
     renderHistory();
+    renderPendientesBadge();
     return;
   }
   try{
@@ -80,16 +207,27 @@ async function loadAll(){
 
     clients = await backendGet('clients');
     records = await backendGet('records');
+    guardarCacheLocal();
+    fusionarPendientesEnRecords();
 
     setConnDot(true);
     setConnStatus('Conectado. ' + clients.length + ' clientes, ' + records.length + ' servicios en el historial.', 'ok');
+
+    reintentarPendientes();
   }catch(err){
     setConnDot(false);
-    setConnStatus('Error al conectar: ' + err.message, 'err');
+    const fechaCache = cargarCacheLocal();
+    fusionarPendientesEnRecords();
+    if(fechaCache){
+      setConnStatus('Sin conexión — trabajando con la copia guardada de las ' + fechaCache + '. Podés seguir sacando fotos, se suben solas cuando vuelva la conexión.', 'err');
+    } else {
+      setConnStatus('Error al conectar: ' + err.message, 'err');
+    }
   }
   renderClientSelect();
   renderClientList();
   renderHistory();
+  renderPendientesBadge();
 }
 
 document.getElementById('companyName').addEventListener('change', async (e)=>{
@@ -807,25 +945,41 @@ if(document.getElementById('empFotoInput')){
       const id = 'r' + now.getTime() + Math.random().toString(36).slice(2,6);
       const resultadoSelectEl = document.getElementById('resultadoSelect');
       const resultado = resultadoSelectEl ? resultadoSelectEl.value : '';
-      const resp = await backendPost({
+      const payload = {
         action: 'addRecord',
         id, cliente: nombre, direccion,
         fechaISO: now.toISOString(), lat, lon, ubicacionManual: '',
         fotoBase64: dataUrl,
         fechaInicioCliente: '', telefonoCliente: '',
         resultado
-      });
+      };
+
+      let fotoUrlFinal = dataUrl;
+      let pendiente = false;
+      try{
+        const resp = await backendPost(payload);
+        fotoUrlFinal = resp.fotoUrl || dataUrl;
+      }catch(errConexion){
+        agregarPendiente(payload);
+        pendiente = true;
+      }
 
       const record = {
         id, cliente: nombre, direccion, telefono:'',
-        fechaISO: now.toISOString(), foto: resp.fotoUrl || dataUrl,
-        lat, lon, ubicacionManual: '', resultado, observacion:'', fotoObservacion:''
+        fechaISO: now.toISOString(), foto: fotoUrlFinal,
+        lat, lon, ubicacionManual: '', resultado, observacion:'', fotoObservacion:'',
+        pendiente
       };
       records.unshift(record);
       renderClientSelect();
       renderHistory();
-      const ubicOk = lat != null ? ' (con ubicación)' : ` (sin ubicación: ${geoErrorReason})`;
-      setStatus('Registrado: ' + nombre + ubicOk, lat != null ? 'ok' : 'err');
+      renderPendientesBadge();
+      if(pendiente){
+        setStatus('Sin conexión: la foto de ' + nombre + ' quedó guardada en el celular, se sube sola cuando vuelva la conexión.', 'err');
+      } else {
+        const ubicOk = lat != null ? ' (con ubicación)' : ` (sin ubicación: ${geoErrorReason})`;
+        setStatus('Registrado: ' + nombre + ubicOk, lat != null ? 'ok' : 'err');
+      }
 
       document.getElementById('empNombreInput').value = '';
       document.getElementById('empDireccionInput').value = '';
@@ -911,17 +1065,27 @@ document.getElementById('photoInput').addEventListener('change', async (e)=>{
     ];
     const dataUrl = await resizeImage(file, 900, 0.7, stampText);
 
-    setStatus('Subiendo foto y guardando el registro...');
     const id = 'r' + now.getTime() + Math.random().toString(36).slice(2,6);
     const resultado = document.getElementById('resultadoSelect').value;
-    const resp = await backendPost({
+    const payload = {
       action: 'addRecord',
       id, cliente: clientObj.nombre, direccion: clientObj.direccion || '',
       fechaISO: now.toISOString(), lat, lon, ubicacionManual: '',
       fotoBase64: dataUrl,
       fechaInicioCliente: clientObj.fechaInicio || '', telefonoCliente: clientObj.telefono || '',
       resultado
-    });
+    };
+
+    setStatus('Subiendo foto y guardando el registro...');
+    let fotoUrlFinal = dataUrl;
+    let pendiente = false;
+    try{
+      const resp = await backendPost(payload);
+      fotoUrlFinal = resp.fotoUrl || dataUrl;
+    }catch(errConexion){
+      agregarPendiente(payload);
+      pendiente = true;
+    }
 
     const record = {
       id,
@@ -929,17 +1093,23 @@ document.getElementById('photoInput').addEventListener('change', async (e)=>{
       direccion: clientObj.direccion || '',
       telefono: clientObj.telefono || '',
       fechaISO: now.toISOString(),
-      foto: resp.fotoUrl || dataUrl,
+      foto: fotoUrlFinal,
       lat, lon,
       ubicacionManual: '',
       resultado,
       observacion: '',
-      fotoObservacion: ''
+      fotoObservacion: '',
+      pendiente
     };
     records.unshift(record);
     renderHistory();
-    const ubicOk = lat != null ? ' (con ubicación)' : ` (sin ubicación: ${geoErrorReason || 'motivo desconocido'})`;
-    setStatus('Registrado: ' + clientObj.nombre + ' — ' + formatTime(now) + ubicOk, lat != null ? 'ok' : 'err');
+    renderPendientesBadge();
+    const ubicOk = lat != null ? ' (con ubicación)' : ` (sin ubicación: ${geoErrorReason})`;
+    if(pendiente){
+      setStatus('Sin conexión: la foto de ' + clientObj.nombre + ' quedó guardada en el celular, se sube sola cuando vuelva la conexión.', 'err');
+    } else {
+      setStatus('Registrado: ' + clientObj.nombre + ' — ' + formatTime(now) + ubicOk, lat != null ? 'ok' : 'err');
+    }
   }catch(err){
     setStatus('Error al guardar el registro: ' + err.message, 'err');
   }
@@ -1203,6 +1373,8 @@ function renderHistory(){
         </details>`;
     }
 
+    const pendienteBadge = rec.pendiente ? `<div style="display:inline-block; font-size:11px; font-weight:700; color:#8A6D3B; background:#FBF3E9; border:1px solid #EEDCC0; padding:3px 9px; border-radius:20px; margin-top:6px; margin-left:6px;">⏳ Pendiente de subir</div>` : '';
+
     div.innerHTML = `
       <div class="ticket-top">
         <button class="ticket-client-edit" data-id="${rec.id}" title="Tocá para corregir nombre/dirección" style="background:none; border:none; padding:0; text-align:left; cursor:pointer; font:inherit;">
@@ -1211,7 +1383,7 @@ function renderHistory(){
         <div class="ticket-code">${rec.id.toUpperCase()}</div>
       </div>
       <div class="ticket-time">${formatDateTime(rec.fechaISO)}</div>
-      ${resultadoBadge}
+      ${resultadoBadge}${pendienteBadge}
       <div class="ticket-body">
         <img class="ticket-photo" src="${rec.foto}">
         <div class="ticket-info">${direccionLine}${ubicacionBlock}</div>

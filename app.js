@@ -251,6 +251,31 @@ document.getElementById('refreshBtn').onclick = async ()=>{
   setStatus('Historial actualizado.', 'ok');
 };
 
+if(document.getElementById('workOfflineBtn')){
+  document.getElementById('workOfflineBtn').onclick = ()=>{
+    // Guarda la URL igual (para que "reintentarPendientes" y el "online" automático
+    // funcionen apenas vuelva la señal), pero no espera a que la conexión falle:
+    // usa la copia guardada YA MISMO.
+    const val = document.getElementById('backendUrlInput').value.trim();
+    if(val){
+      backendUrl = val;
+      localStorage.setItem(BACKEND_URL_KEY, backendUrl);
+    }
+    setConnDot(false);
+    const fechaCache = cargarCacheLocal();
+    fusionarPendientesEnRecords();
+    if(fechaCache){
+      setConnStatus('Trabajando sin conexión — copia guardada de las ' + fechaCache + '. Se sube todo solo apenas vuelva la conexión.', 'err');
+    } else {
+      setConnStatus('Todavía no hay ninguna copia guardada en este celular (nunca se conectó bien acá). Conectá una vez con señal antes de poder usar esto.', 'err');
+    }
+    renderClientSelect();
+    renderClientList();
+    renderHistory();
+    renderPendientesBadge();
+  };
+}
+
 // ---------- Clientes ----------
 
 const DIAS_CANON = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];

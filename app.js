@@ -172,19 +172,42 @@ window.addEventListener('unhandledrejection', (e)=>{
 
 async function backendGet(action){
   if(!backendUrl) throw new Error('Todavía no conectaste el backend (pegá la URL arriba).');
-  const res = await fetch(backendUrl + '?action=' + encodeURIComponent(action));
-  const data = await res.json();
-  if(data && data.error) throw new Error(data.error);
-  return data;
+  const url = backendUrl + '?action=' + encodeURIComponent(action) + '&_=' + Date.now();
+  const intentar = async ()=>{
+    const res = await fetch(url, { cache: 'no-store' });
+    const texto = await res.text();
+    let data;
+    try{
+      data = JSON.parse(texto);
+    }catch(errParse){
+      throw new Error('Google no devolvió una respuesta válida en este intento (suele ser un bache pasajero). Probá de nuevo en unos segundos.');
+    }
+    if(data && data.error) throw new Error(data.error);
+    return data;
+  };
+  try{
+    return await intentar();
+  }catch(err){
+    // Reintentamos una vez más antes de rendirnos, por si fue un bache de un solo instante.
+    await new Promise(r => setTimeout(r, 1200));
+    return await intentar();
+  }
 }
 async function backendPost(payload){
   if(!backendUrl) throw new Error('Todavía no conectaste el backend (pegá la URL arriba).');
   const res = await fetch(backendUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    cache: 'no-store'
   });
-  const data = await res.json();
+  const texto = await res.text();
+  let data;
+  try{
+    data = JSON.parse(texto);
+  }catch(errParse){
+    throw new Error('Google no devolvió una respuesta válida (suele ser un bache pasajero).');
+  }
   if(data && data.error) throw new Error(data.error);
   return data;
 }

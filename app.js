@@ -354,11 +354,18 @@ function registroHechoEsteDia(c, diaCanon){
   const diasDelCliente = diasDeCliente(c);
   const esMultiDia = diasDelCliente.length > 1; // ej: "Lunes, Miércoles y Viernes"
   const idxEsperado = DIA_INDEX[diaCanon];
-  // Comparamos nombre Y dirección, para no confundir a dos clientes homónimos
-  // que viven en lugares distintos (por ejemplo, dos "Maurino Paula" distintas).
+  const tieneHuella = c.fechaInicio && c.telefono;
+  // Reconocemos al cliente por "huella estable" (fecha de inicio + teléfono) si
+  // está disponible, para que no se pierda el historial si le cambiaron la
+  // dirección — y si no, por nombre + dirección como respaldo (para no
+  // confundir a dos clientes homónimos que viven en lugares distintos).
   return records.find(r=>{
-    if(r.cliente !== c.nombre) return false;
-    if((r.direccion || '').trim().toLowerCase() !== direccionNorm) return false;
+    if(tieneHuella && r.fechaInicioCliente && r.telefonoCliente){
+      if(r.fechaInicioCliente.trim() !== c.fechaInicio.trim() || r.telefonoCliente.trim() !== c.telefono.trim()) return false;
+    } else {
+      if(r.cliente !== c.nombre) return false;
+      if((r.direccion || '').trim().toLowerCase() !== direccionNorm) return false;
+    }
     const f = new Date(r.fechaISO);
     if(f < inicio) return false;
     if(esMultiDia){

@@ -592,6 +592,7 @@ function crearFilaCliente(c, i, grupo){
     // tenga esa nota vieja en Observaciones de antes de separar los dos sistemas.
     if(c.colorReserva === 'amarillo') marcaTexto += ' 🟡';
     else if(c.colorReserva === 'verde') marcaTexto += ' 🟢';
+    else if(c.colorReserva === 'marron') marcaTexto += ' 🟤';
     if(c.fechaInicio) marcaTexto += ` <span style="color:#8A9793; font-size:12px;">Inicio: ${escapeHtml(formatFechaCorta(c.fechaInicio))}</span>`;
   } else if(c.marcaRetiro){
     // Buscamos el pedacito de la observación que empieza con "Retirar", para mostrar la fecha real puesta ahí.
@@ -653,7 +654,7 @@ function crearFilaCliente(c, i, grupo){
       <option value="">Color...</option>
       <option value="amarillo">🟡 Amarillo</option>
       <option value="verde">🟢 Verde</option>
-      <option value="blanco">⚪ Sin color</option>
+      <option value="marron">🟤 Marrón</option>
     `;
     if(c.colorReserva) selectColorReserva.value = c.colorReserva;
 
@@ -671,8 +672,8 @@ function crearFilaCliente(c, i, grupo){
       btnAplicarColor.disabled = true;
       try{
         await backendPost({ action:'marcarColorReserva', nombre: c.nombre, direccion: c.direccion || '', color });
-        c.colorReserva = (color === 'blanco') ? '' : color;
-        setStatus(color === 'blanco' ? ('Se sacó el color de ' + c.nombre) : ('Marcado (' + color + '): ' + c.nombre), 'ok');
+        c.colorReserva = color;
+        setStatus('Marcado (' + color + '): ' + c.nombre, 'ok');
         renderClientList();
         return;
       }catch(err){

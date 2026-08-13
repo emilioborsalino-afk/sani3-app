@@ -360,12 +360,10 @@ function registroHechoEsteDia(c, diaCanon){
   // dirección — y si no, por nombre + dirección como respaldo (para no
   // confundir a dos clientes homónimos que viven en lugares distintos).
   return records.find(r=>{
-    if(tieneHuella && r.fechaInicioCliente && r.telefonoCliente){
-      if(r.fechaInicioCliente.trim() !== c.fechaInicio.trim() || r.telefonoCliente.trim() !== c.telefono.trim()) return false;
-    } else {
-      if(r.cliente !== c.nombre) return false;
-      if((r.direccion || '').trim().toLowerCase() !== direccionNorm) return false;
-    }
+    const coincideHuella = tieneHuella && r.fechaInicioCliente && r.telefonoCliente &&
+      r.fechaInicioCliente.trim() === c.fechaInicio.trim() && r.telefonoCliente.trim() === c.telefono.trim();
+    const coincideNombreDireccion = r.cliente === c.nombre && (r.direccion || '').trim().toLowerCase() === direccionNorm;
+    if(!coincideHuella && !coincideNombreDireccion) return false;
     const f = new Date(r.fechaISO);
     if(f < inicio) return false;
     if(esMultiDia){

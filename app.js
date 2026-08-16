@@ -392,6 +392,7 @@ function registroHechoEsteDia(c, diaCanon){
 }
 
 let selectedClientIndex = null;
+let diaAccordionAbierto = null; // recuerda qué día quedó desplegado, para no cerrarlo solo al reconectar en segundo plano
 
 function updateSelectedLabel(){
   const label = document.getElementById('selectedClientLabel');
@@ -485,7 +486,9 @@ function renderClientSelect(){
 
     const body = document.createElement('div');
     body.className = 'acc-body';
-    body.style.cssText = 'display:' + (filtro ? 'block' : 'none') + '; background:#fff;';
+    const abiertoDeAntes = !filtro && diaAccordionAbierto === d;
+    body.style.cssText = 'display:' + ((filtro || abiertoDeAntes) ? 'block' : 'none') + '; background:#fff;';
+    if(abiertoDeAntes) arrow.textContent = '▴';
 
     grupos[d].forEach(i=>{
       const c = clients[i];
@@ -588,6 +591,7 @@ function renderClientSelect(){
       wrap.querySelectorAll('.acc-arrow').forEach(a=>a.textContent='▾');
       body.style.display = isOpen ? 'none' : 'block';
       arrow.textContent = isOpen ? '▾' : '▴';
+      diaAccordionAbierto = isOpen ? null : d;
     };
 
     section.appendChild(header);

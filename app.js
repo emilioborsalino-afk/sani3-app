@@ -223,16 +223,29 @@ async function backendPost(payload){
 
 async function loadAll(){
   document.getElementById('companyName').value = config.companyName || '';
+
+  // Primero mostramos YA MISMO lo que haya guardado en el celular (si hay),
+  // para que puedas empezar a trabajar al toque, sin esperar a ver si Google
+  // responde rápido o lento hoy.
+  const fechaCache = cargarCacheLocal();
+  fusionarPendientesEnRecords();
+  renderClientSelect();
+  renderClientList();
+  renderHistory();
+  renderPendientesBadge();
+
   if(!backendUrl){
     setConnDot(false);
-    cargarCacheLocal();
-    fusionarPendientesEnRecords();
-    renderClientSelect();
-    renderClientList();
-    renderHistory();
-    renderPendientesBadge();
     return;
   }
+
+  setConnDot(false);
+  setConnStatus(fechaCache
+    ? ('Conectando... mientras tanto podés seguir trabajando con la copia guardada de las ' + fechaCache + '.')
+    : 'Conectando...');
+
+  // Recién ahora, en segundo plano, intentamos la conexión de verdad — sin
+  // que esto bloquee ni retrase lo que ya se mostró arriba.
   try{
     config = await backendGet('config');
     document.getElementById('companyName').value = config.companyName || '';
@@ -248,10 +261,10 @@ async function loadAll(){
     reintentarPendientes();
   }catch(err){
     setConnDot(false);
-    const fechaCache = cargarCacheLocal();
+    const fechaCacheFalla = cargarCacheLocal();
     fusionarPendientesEnRecords();
-    if(fechaCache){
-      setConnStatus('Sin conexión — trabajando con la copia guardada de las ' + fechaCache + '. Podés seguir sacando fotos, se suben solas cuando vuelva la conexión.', 'err');
+    if(fechaCacheFalla){
+      setConnStatus('Sin conexión — trabajando con la copia guardada de las ' + fechaCacheFalla + '. Podés seguir sacando fotos, se suben solas cuando vuelva la conexión.', 'err');
     } else {
       setConnStatus('Error al conectar: ' + err.message, 'err');
     }

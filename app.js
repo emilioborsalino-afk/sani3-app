@@ -360,38 +360,57 @@ function inicioSemanaActual(){
 
 const DIA_INDEX = { 'Domingo':0, 'Lunes':1, 'Martes':2, 'Miercoles':3, 'Jueves':4, 'Viernes':5, 'Sabado':6 };
 
+function normalizarDiaTexto(s){
+  return String(s || '').toLowerCase()
+    .replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u').trim();
+}
+
 function registroHechoEsteDia(c, diaCanon){
   const inicio = inicioSemanaActual();
   if(diaCanon === 'Otros') return null; // "Otros" no tiene día fijo, no aplica el check
   const direccionNorm = (c.direccion || '').trim().toLowerCase();
   const diasDelCliente = diasDeCliente(c);
   const esMultiDia = diasDelCliente.length > 1; // ej: "Lunes, Miércoles y Viernes"
-  const idxEsperado = DIA_INDEX[diaCanon];
   const tieneHuella = c.fechaInicio && c.telefono;
   // Reconocemos al cliente por "huella estable" (fecha de inicio + teléfono) si
   // está disponible, para que no se pierda el historial si le cambiaron la
   // dirección — y si no, por nombre + dirección como respaldo (para no
   // confundir a dos clientes homónimos que viven en lugares distintos).
-  return records.find(r=>{
+  function coincideCliente(r){
     const coincideHuella = tieneHuella && r.fechaInicioCliente && r.telefonoCliente &&
       r.fechaInicioCliente.trim() === c.fechaInicio.trim() && r.telefonoCliente.trim() === c.telefono.trim();
     const coincideNombreDireccion = r.cliente === c.nombre && (r.direccion || '').trim().toLowerCase() === direccionNorm;
-    if(!coincideHuella && !coincideNombreDireccion) return false;
-    const f = new Date(r.fechaISO);
-    if(f < inicio) return false;
-    if(esMultiDia){
-      // Cliente con varios días por semana: cada día se controla por separado,
-      // con el día exacto (si le toca lunes/miércoles/viernes, marcar el lunes
-      // no debe marcar también miércoles y viernes).
-      return idxEsperado != null && f.getDay() === idxEsperado;
-    }
+    return coincideHuella || coincideNombreDireccion;
+  }
+
+  const registrosEstaSemana = records
+    .filter(r => coincideCliente(r) && new Date(r.fechaISO) >= inicio)
+    .sort((a, b) => new Date(a.fechaISO) - new Date(b.fechaISO));
+
+  if(!esMultiDia){
     // Cliente de un solo día: alcanza con que se haya hecho esta semana,
     // sin importar si se adelantó o atrasó respecto al día asignado.
-    return true;
-  }) || null;
+    return registrosEstaSemana[0] || null;
+  }
+
+  // Cliente con varios días por semana (ej: lunes, miércoles y viernes).
+  // Prioridad 1: si algún registro de esta semana tiene guardado explícitamente
+  // para qué día era (el día desde el que se tocó al cliente al sacar la
+  // foto), usamos justo ese — así, aunque hoy sea otro día (por un feriado que
+  // corrió el trabajo), queda marcado el día que realmente correspondía.
+  const porDiaExplicito = registrosEstaSemana.find(r => r.dia && normalizarDiaTexto(r.dia) === normalizarDiaTexto(diaCanon));
+  if(porDiaExplicito) return porDiaExplicito;
+
+  // Respaldo (para registros viejos, de antes de guardar este dato): se
+  // completan en orden entre los días asignados.
+  const diasOrdenados = [...diasDelCliente].sort((a, b) => DIA_INDEX[a] - DIA_INDEX[b]);
+  const posicion = diasOrdenados.indexOf(diaCanon);
+  if(posicion === -1) return null;
+  return registrosEstaSemana[posicion] || null;
 }
 
 let selectedClientIndex = null;
+let selectedDiaCanon = null; // desde qué día (Lunes/Martes/etc.) se tocó el cliente al elegirlo
 let diaAccordionAbierto = null; // recuerda qué día quedó desplegado, para no cerrarlo solo al reconectar en segundo plano
 
 function updateSelectedLabel(){
@@ -523,6 +542,7 @@ function renderClientSelect(){
         : `<strong>${escapeHtml(c.nombre)}</strong>`) + extraReserva + check;
       btnInfo.onclick = ()=>{
         selectedClientIndex = i;
+        selectedDiaCanon = d;
         updateSelectedLabel();
         wrap.querySelectorAll('[data-idx]').forEach(el=> el.style.background = '#fff');
         item.style.background = '#E3ECEA';
@@ -1031,7 +1051,7 @@ if(document.getElementById('empFotoInput')){
         fechaISO: now.toISOString(), lat, lon, ubicacionManual: '',
         fotoBase64: dataUrl,
         fechaInicioCliente: '', telefonoCliente: '',
-        resultado
+        resultado, diaAsignado: selectedDiaCanon || ''
       };
 
       let fotoUrlFinal = dataUrl;
@@ -1153,7 +1173,7 @@ document.getElementById('photoInput').addEventListener('change', async (e)=>{
       fechaISO: now.toISOString(), lat, lon, ubicacionManual: '',
       fotoBase64: dataUrl,
       fechaInicioCliente: clientObj.fechaInicio || '', telefonoCliente: clientObj.telefono || '',
-      resultado
+      resultado, diaAsignado: selectedDiaCanon || ''
     };
 
     setStatus('Subiendo foto y guardando el registro...');

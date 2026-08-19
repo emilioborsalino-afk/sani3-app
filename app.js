@@ -554,7 +554,8 @@ function renderClientSelect(){
       const c = clients[i];
       const item = document.createElement('div');
       item.dataset.idx = i;
-      item.style.cssText = 'display:flex; align-items:stretch; border-top:1px solid var(--line); background:' + (selectedClientIndex===i ? '#E3ECEA' : '#fff') + ';';
+      const fondoSuspendido = c.suspendido ? '#F3E8FF' : (selectedClientIndex===i ? '#E3ECEA' : '#fff');
+      item.style.cssText = 'display:flex; align-items:stretch; border-top:1px solid var(--line); background:' + fondoSuspendido + ';';
 
       const btnInfo = document.createElement('button');
       btnInfo.type = 'button';
@@ -578,10 +579,17 @@ function renderClientSelect(){
           extraReserva = `<br><span style="color:#8A9793; font-size:11.5px;">${escapeHtml(datos.join(' · '))}</span>`;
         }
       }
+      const avisoSuspendido = c.suspendido
+        ? `<br><span style="color:#6A0DAD; font-weight:700; font-size:12.5px;">🚫 SUSPENDIDO — no desagotar hasta reactivar</span>`
+        : '';
       btnInfo.innerHTML = (c.direccion
         ? `<strong>${escapeHtml(c.nombre)}</strong><br><span style="color:#8A9793; font-size:12.5px;">${escapeHtml(c.direccion)}</span>`
-        : `<strong>${escapeHtml(c.nombre)}</strong>`) + extraReserva + check;
+        : `<strong>${escapeHtml(c.nombre)}</strong>`) + avisoSuspendido + extraReserva + check;
       btnInfo.onclick = ()=>{
+        if(c.suspendido){
+          const seguro = confirm('⚠ "' + c.nombre + '" está marcado como SUSPENDIDO (por ejemplo, por falta de pago).\n\n¿Seguro que querés registrarle el servicio igual?');
+          if(!seguro) return;
+        }
         selectedClientIndex = i;
         selectedDiaCanon = d;
         updateSelectedLabel();
@@ -677,6 +685,10 @@ function crearFilaCliente(c, i, grupo){
     else if(c.colorReserva === 'verde') marcaTexto += ' 🟢';
     else if(c.colorReserva === 'marron') marcaTexto += ' 🟤';
     if(c.fechaInicio) marcaTexto += ` <span style="color:#8A9793; font-size:12px;">Inicio: ${escapeHtml(formatFechaCorta(c.fechaInicio))}</span>`;
+  } else if(c.marcaRetiro === 'celeste'){
+    const partesObsSusp = (c.observacion || '').split('|').map(p => p.trim());
+    const notaSuspension = partesObsSusp.find(p => p.toLowerCase().indexOf('suspendido') === 0) || 'Suspendido';
+    marcaTexto = ` <span style="color:#1E6FA3; font-weight:700; font-size:12px;">🔵 ${escapeHtml(notaSuspension)}</span>`;
   } else if(c.marcaRetiro){
     // Buscamos el pedacito de la observación que empieza con "Retirar", para mostrar la fecha real puesta ahí.
     const partesObs = (c.observacion || '').split('|').map(p => p.trim());
@@ -795,6 +807,7 @@ function crearFilaCliente(c, i, grupo){
       <option value="">Marcar...</option>
       <option value="rojo">🔴 Rojo (retirar)</option>
       <option value="amarillo">🟡 Amarillo (retirar)</option>
+      <option value="celeste">🔵 Celeste (Suspendido)</option>
       <option value="blanco">⚪ Quitar marca</option>
     `;
     if(c.marcaRetiro) selectColor.value = c.marcaRetiro;
@@ -809,9 +822,12 @@ function crearFilaCliente(c, i, grupo){
         return;
       }
       let fechaTexto = '';
-      if(color !== 'blanco'){
+      if(color === 'rojo' || color === 'amarillo'){
         fechaTexto = prompt('¿Para cuándo hay que retirar el baño de "' + c.nombre + '"? (podés escribirla como quieras, por ejemplo: 24/7/26). Dejá vacío si todavía no sabés la fecha.', '');
         if(fechaTexto === null) return; // canceló
+      } else if(color === 'celeste'){
+        const confirmado = confirm('¿Marcar a "' + c.nombre + '" como SUSPENDIDO (por ejemplo, por falta de pago)?\n\nLos empleados van a ver un aviso para no desagotarlo hasta que lo reactives.');
+        if(!confirmado) return;
       }
       const textoOriginal = btnAplicar.textContent;
       btnAplicar.textContent = 'Aplicando...';
@@ -819,8 +835,10 @@ function crearFilaCliente(c, i, grupo){
       try{
         await backendPost({ action:'marcarClienteParaRetirar', nombre: c.nombre, direccion: c.direccion || '', color, fechaTexto });
         c.marcaRetiro = (color === 'blanco') ? '' : color;
+        c.suspendido = (color === 'celeste');
         setStatus(color === 'blanco' ? ('Se sacó la marca de ' + c.nombre) : ('Marcado (' + color + '): ' + c.nombre), 'ok');
         renderClientList();
+        renderClientSelect();
         return; // ya se volvió a dibujar todo, no hace falta tocar más este botón
       }catch(err){
         setStatus('No se pudo marcar: ' + err.message, 'err');
@@ -857,7 +875,7 @@ function renderClientList(){
     const dias = diasDeCliente(c);
     dias.forEach(d => grupos[d].push(i));
     const esDiaActivo = dias.some(d => d !== 'Otros'); // solo Lunes a Sábado, no "Empresas con reserva"
-    if(c.marcaRetiro && esDiaActivo) grupos['ProximoRetirar'].push(i);
+    if(c.marcaRetiro && c.marcaRetiro !== 'celeste' && esDiaActivo) grupos['ProximoRetirar'].push(i);
   });
 
   // Dentro de "Otros / Empresas con reserva", ordenamos por fecha de inicio:

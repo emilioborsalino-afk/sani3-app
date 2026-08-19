@@ -170,6 +170,40 @@ window.addEventListener('unhandledrejection', (e)=>{
 
 // ---------- Llamadas al backend (Google Apps Script) ----------
 
+// ---------- Bloquear el cierre de la app mientras se está guardando una foto ----------
+let guardadoEnProgreso = false;
+
+function iniciarGuardadoProtegido(){
+  guardadoEnProgreso = true;
+  const banner = document.getElementById('noCerrarBanner');
+  if(banner) banner.style.display = 'block';
+  // Metemos un estado extra en el historial: si tocan "atrás" mientras se
+  // guarda, en vez de salir de la app, vuelve a este mismo estado (no deja
+  // salir hasta que termine).
+  try{ history.pushState({ guardando: true }, ''); }catch(err){ /* no pasa nada si falla */ }
+}
+
+function terminarGuardadoProtegido(){
+  guardadoEnProgreso = false;
+  const banner = document.getElementById('noCerrarBanner');
+  if(banner) banner.style.display = 'none';
+}
+
+window.addEventListener('beforeunload', (e)=>{
+  if(guardadoEnProgreso){
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
+window.addEventListener('popstate', ()=>{
+  if(guardadoEnProgreso){
+    // Cancela el "atrás": lo empuja de nuevo para adelante y avisa.
+    try{ history.pushState({ guardando: true }, ''); }catch(err){ /* nada */ }
+    setStatus('Esperá a que termine de guardar la foto antes de salir.', 'err');
+  }
+});
+
 function cargarJSONP(url){
   return new Promise((resolve, reject)=>{
     const cbName = 'jsonp_cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
@@ -1021,6 +1055,7 @@ if(document.getElementById('empFotoInput')){
     else geoErrorReason = 'no se consiguió ubicación — tocá "Usar mi ubicación actual" antes de sacar la foto';
 
     try{
+      iniciarGuardadoProtegido();
       const now = new Date();
       const clientLabel = direccion ? `${nombre} — ${direccion}` : nombre;
       const stampText = [
@@ -1088,6 +1123,7 @@ if(document.getElementById('empFotoInput')){
     }catch(err){
       setStatus('Error al guardar el registro: ' + err.message, 'err');
     }
+    terminarGuardadoProtegido();
     e.target.value = '';
   });
 }
@@ -1157,6 +1193,7 @@ document.getElementById('photoInput').addEventListener('change', async (e)=>{
   }
 
   try{
+    iniciarGuardadoProtegido();
     const now = new Date();
     const stampText = [
       clientLabel,
@@ -1213,6 +1250,7 @@ document.getElementById('photoInput').addEventListener('change', async (e)=>{
   }catch(err){
     setStatus('Error al guardar el registro: ' + err.message, 'err');
   }
+  terminarGuardadoProtegido();
   e.target.value = '';
 });
 

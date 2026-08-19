@@ -427,20 +427,27 @@ function registroHechoEsteDia(c, diaCanon){
     return registrosEstaSemana[0] || null;
   }
 
-  // Cliente con varios días por semana (ej: lunes, miércoles y viernes).
-  // Prioridad 1: si algún registro de esta semana tiene guardado explícitamente
-  // para qué día era (el día desde el que se tocó al cliente al sacar la
-  // foto), usamos justo ese — así, aunque hoy sea otro día (por un feriado que
-  // corrió el trabajo), queda marcado el día que realmente correspondía.
-  const porDiaExplicito = registrosEstaSemana.find(r => r.dia && normalizarDiaTexto(r.dia) === normalizarDiaTexto(diaCanon));
-  if(porDiaExplicito) return porDiaExplicito;
-
-  // Respaldo (para registros viejos, de antes de guardar este dato): se
-  // completan en orden entre los días asignados.
+  // Cliente con varios días por semana (ej: lunes, miércoles y viernes): cada
+  // servicio de la semana solo puede "tapar" UN día (no puede cubrir dos a la
+  // vez, ni aunque coincida por casualidad con el día real de hoy). Primero
+  // se asignan los que tienen guardado explícitamente para qué día eran (el
+  // día desde el que se tocó al cliente al sacar la foto); los que sobran se
+  // reparten en orden entre los días que todavía no tengan uno asignado.
   const diasOrdenados = [...diasDelCliente].sort((a, b) => DIA_INDEX[a] - DIA_INDEX[b]);
-  const posicion = diasOrdenados.indexOf(diaCanon);
-  if(posicion === -1) return null;
-  return registrosEstaSemana[posicion] || null;
+  const diasCubiertos = {};
+  const registrosSinUsar = [...registrosEstaSemana];
+  diasOrdenados.forEach(d => {
+    const idx = registrosSinUsar.findIndex(r => r.dia && normalizarDiaTexto(r.dia) === normalizarDiaTexto(d));
+    if(idx !== -1){
+      diasCubiertos[d] = registrosSinUsar[idx];
+      registrosSinUsar.splice(idx, 1);
+    }
+  });
+  diasOrdenados.forEach(d => {
+    if(diasCubiertos[d]) return;
+    if(registrosSinUsar.length > 0) diasCubiertos[d] = registrosSinUsar.shift();
+  });
+  return diasCubiertos[diaCanon] || null;
 }
 
 let selectedClientIndex = null;

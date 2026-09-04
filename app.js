@@ -656,24 +656,26 @@ function renderClientSelect(){
         registerBtn.dataset.disabled = 'false';
         registerBtn.classList.remove('disabled-look');
 
-        // Si viene del grupo de "Pendientes de esta semana" y todavía no tiene
-        // nada cargado (no está ni siquiera marcado a mano en la planilla), lo
-        // llevamos DERECHO a sacar la foto — no hace falta que toque el botón
-        // aparte. Tiene que ser síncrono (sin esperar nada) para que el
-        // celular no bloquee la apertura de la cámara.
-        if(pendienteInfo && !pendienteInfo.marcadoComoHecho){
-          registerBtn.click();
-          return;
+        // Si ya se le sacó la foto esta semana, lo llevamos directo a ese
+        // ticket (para verla, agregar una observación, o corregir el
+        // resultado) — esto vale para cualquier grupo (Lunes...Viernes, Otros,
+        // o Pendientes). Si todavía NO se le sacó ninguna foto esta semana, en
+        // cambio, bajamos suave hasta la parte de la app donde se elige el
+        // resultado y se saca la foto — así no hay que desplazarse a mano.
+        // Única excepción: si ya lo marcaste como "hecho" a mano en la
+        // planilla de Pendientes (esperando a que se procese solo), no hace
+        // falta sacarle otra foto, así que no hacemos nada especial.
+        const yaMarcadoEnPlanilla = pendienteInfo && pendienteInfo.marcadoComoHecho;
+        if(registroSemana){
+          setTimeout(()=> irAlTicket(registroSemana.id), 150);
+        } else if(!yaMarcadoEnPlanilla){
+          setTimeout(()=>{
+            registerBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 50);
         }
         // colapsamos todo despues de elegir, para que quede prolijo
         wrap.querySelectorAll('.acc-body').forEach(b=>b.style.display='none');
         wrap.querySelectorAll('.acc-arrow').forEach(a=>a.textContent='▾');
-
-        // si ya se le hizo un servicio esta semana, lo llevamos directo a ese ticket
-        // (para ver la foto, agregar una observación, o corregir el resultado)
-        if(registroSemana){
-          setTimeout(()=> irAlTicket(registroSemana.id), 150);
-        }
       };
       item.appendChild(btnInfo);
 

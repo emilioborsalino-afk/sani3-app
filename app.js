@@ -7,6 +7,7 @@ const BACKEND_URL_KEY = 'sani3_backend_url';
 let backendUrl = '';
 let clients = [];
 let records = [];
+let pendientesSemana = []; // lista de "Pendientes de esta semana" (viene de la planilla, se muestra como grupo extra)
 let config = { companyName: 'Sani3' };
 let ubicacionActual = null;      // {lat, lon} de la última vez que se consiguió bien
 let obsFotosTemp = {};           // fotos de observación ya procesadas, esperando a que se guarden
@@ -17,12 +18,14 @@ const CLIENTES_PRECARGADOS = []; // ya no se usa: los clientes se leen en vivo d
 // ---------- Trabajar sin conexión: caché local + fotos pendientes de subir ----------
 const CLIENTS_CACHE_KEY = 'sani3_clients_cache';
 const RECORDS_CACHE_KEY = 'sani3_records_cache';
+const PENDIENTES_SEMANA_CACHE_KEY = 'sani3_pendientes_semana_cache';
 const PENDING_KEY = 'sani3_pending_queue';
 
 function guardarCacheLocal(){
   try{
     localStorage.setItem(CLIENTS_CACHE_KEY, JSON.stringify({ clients, guardadoEn: new Date().toISOString() }));
     localStorage.setItem(RECORDS_CACHE_KEY, JSON.stringify({ records, guardadoEn: new Date().toISOString() }));
+    localStorage.setItem(PENDIENTES_SEMANA_CACHE_KEY, JSON.stringify({ pendientesSemana, guardadoEn: new Date().toISOString() }));
   }catch(err){ /* si no entra en el almacenamiento del celular, no pasa nada grave */ }
 }
 
@@ -37,6 +40,10 @@ function cargarCacheLocal(){
     const registrosGuardados = localStorage.getItem(RECORDS_CACHE_KEY);
     if(registrosGuardados){
       records = JSON.parse(registrosGuardados).records || [];
+    }
+    const pendientesGuardados = localStorage.getItem(PENDIENTES_SEMANA_CACHE_KEY);
+    if(pendientesGuardados){
+      pendientesSemana = JSON.parse(pendientesGuardados).pendientesSemana || [];
     }
     const fecha = new Date(parsedClientes.guardadoEn);
     return fecha.toLocaleDateString('es-AR') + ' ' + fecha.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
@@ -286,6 +293,7 @@ async function loadAll(){
 
     clients = await backendGet('clients');
     records = await backendGet('records');
+    try{ pendientesSemana = await backendGet('pendientesSemana'); }catch(errPend){ /* si falla, seguimos sin el listado extra, no es crítico */ }
     guardarCacheLocal();
     fusionarPendientesEnRecords();
 
@@ -514,13 +522,32 @@ function renderClientSelect(){
   const filtro = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
   const grupos = {};
-  DIAS_CANON.concat(['Otros']).forEach(d => grupos[d] = []);
+  DIAS_CANON.concat(['Otros', 'PendientesSemana']).forEach(d => grupos[d] = []);
   clients.forEach((c, i)=>{
     if(filtro && !c.nombre.toLowerCase().includes(filtro)) return;
     diasDeCliente(c).forEach(d => grupos[d].push(i));
   });
 
-  const hayResultados = DIAS_CANON.concat(['Otros']).some(d => grupos[d].length > 0);
+  // Grupo extra: "Pendientes de esta semana", el mismo listado que ya ves en
+  // la planilla. Buscamos a qué cliente corresponde cada fila (por nombre, y
+  // por dirección si la tenemos) para poder abrirlo directo y sacarle la foto
+  // desde acá mismo, sin tener que ir a la planilla.
+  const pendienteInfoPorIndice = {}; // idx del cliente -> su fila de "Pendientes de esta semana"
+  pendientesSemana.forEach(p=>{
+    if(filtro && !p.cliente.toLowerCase().includes(filtro)) return;
+    const nombreP = p.cliente.trim().toLowerCase();
+    const direccionP = (p.direccion || '').trim().toLowerCase();
+    const idx = clients.findIndex(c=>{
+      if(c.nombre.trim().toLowerCase() !== nombreP) return false;
+      if(direccionP) return (c.direccion || '').trim().toLowerCase() === direccionP;
+      return true;
+    });
+    if(idx === -1) return; // no está en la lista actual de clientes (raro) — no rompemos nada, solo no lo mostramos acá
+    if(grupos['PendientesSemana'].indexOf(idx) === -1) grupos['PendientesSemana'].push(idx);
+    pendienteInfoPorIndice[idx] = p;
+  });
+
+  const hayResultados = DIAS_CANON.concat(['Otros', 'PendientesSemana']).some(d => grupos[d].length > 0);
   if(filtro && !hayResultados){
     wrap.innerHTML = '<div class="empty" style="padding:16px 0;">Ningún cliente coincide con esa búsqueda.</div>';
     return;
@@ -537,7 +564,7 @@ function renderClientSelect(){
     return fa < fb ? -1 : (fa > fb ? 1 : 0);
   });
 
-  DIAS_CANON.concat(['Otros']).forEach(d=>{
+  DIAS_CANON.concat(['Otros', 'PendientesSemana']).forEach(d=>{
     if(grupos[d].length === 0) return;
 
     const section = document.createElement('div');
@@ -545,9 +572,11 @@ function renderClientSelect(){
 
     const header = document.createElement('button');
     header.type = 'button';
-    header.style.cssText = 'width:100%; text-align:left; background:var(--teal); color:#fff; padding:12px 14px; font-family:var(--disp); font-weight:700; font-size:15px; border:none; display:flex; justify-content:space-between; align-items:center; cursor:pointer;';
+    const colorHeader = d === 'PendientesSemana' ? '#B4432B' : 'var(--teal)';
+    header.style.cssText = 'width:100%; text-align:left; background:' + colorHeader + '; color:#fff; padding:12px 14px; font-family:var(--disp); font-weight:700; font-size:15px; border:none; display:flex; justify-content:space-between; align-items:center; cursor:pointer;';
     const label = document.createElement('span');
-    label.textContent = (d === 'Otros' ? 'Otros / Empresas con reserva' : d) + ` (${grupos[d].length})`;
+    const nombreGrupoTexto = d === 'Otros' ? 'Otros / Empresas con reserva' : (d === 'PendientesSemana' ? '⚠️ Pendientes de esta semana' : d);
+    label.textContent = nombreGrupoTexto + ` (${grupos[d].length})`;
     const arrow = document.createElement('span');
     arrow.textContent = filtro ? '▴' : '▾';
     arrow.className = 'acc-arrow';
@@ -570,9 +599,22 @@ function renderClientSelect(){
       const btnInfo = document.createElement('button');
       btnInfo.type = 'button';
       btnInfo.style.cssText = 'flex:1; text-align:left; padding:12px 14px; border:none; background:none; font-family:var(--body); font-size:14.5px; color:var(--ink); cursor:pointer;';
-      const registroSemana = registroHechoEsteDia(c, d);
+      const pendienteInfo = d === 'PendientesSemana' ? pendienteInfoPorIndice[i] : null;
+      // El día con el que va a quedar tageada la foto: si venimos del grupo de
+      // pendientes, usamos el día que le faltó (no "PendientesSemana", que no
+      // es un día real) — así el registro se guarda igual que si lo hubieras
+      // tocado desde su pestaña de siempre.
+      const diaParaRegistrar = pendienteInfo ? pendienteInfo.diaQueFalto : d;
+      const registroSemana = pendienteInfo ? null : registroHechoEsteDia(c, d);
       let check = '';
-      if(registroSemana){
+      if(pendienteInfo){
+        const yaMarcado = pendienteInfo.marcadoComoHecho;
+        if(yaMarcado){
+          check = ` <span style="color:var(--green); font-weight:700;">✓ Ya lo marcaste como hecho en la planilla — falta que se procese</span>`;
+        } else {
+          check = ` <span style="color:#B4432B; font-weight:700;">⚠️ Faltó el ${escapeHtml(pendienteInfo.diaQueFalto)} (semana del ${escapeHtml(pendienteInfo.semanaDel)})</span>`;
+        }
+      } else if(registroSemana){
         const esOk = registroSemana.resultado === 'Se limpió y se desagotó';
         const color = esOk ? 'var(--green)' : '#C0392B';
         const marca = esOk ? '✓' : '⚠️';
@@ -607,12 +649,22 @@ function renderClientSelect(){
           if(!seguro) return;
         }
         selectedClientIndex = i;
-        selectedDiaCanon = d;
+        selectedDiaCanon = diaParaRegistrar;
         updateSelectedLabel();
         wrap.querySelectorAll('[data-idx]').forEach(el=> el.style.background = '#fff');
         item.style.background = '#E3ECEA';
         registerBtn.dataset.disabled = 'false';
         registerBtn.classList.remove('disabled-look');
+
+        // Si viene del grupo de "Pendientes de esta semana" y todavía no tiene
+        // nada cargado (no está ni siquiera marcado a mano en la planilla), lo
+        // llevamos DERECHO a sacar la foto — no hace falta que toque el botón
+        // aparte. Tiene que ser síncrono (sin esperar nada) para que el
+        // celular no bloquee la apertura de la cámara.
+        if(pendienteInfo && !pendienteInfo.marcadoComoHecho){
+          registerBtn.click();
+          return;
+        }
         // colapsamos todo despues de elegir, para que quede prolijo
         wrap.querySelectorAll('.acc-body').forEach(b=>b.style.display='none');
         wrap.querySelectorAll('.acc-arrow').forEach(a=>a.textContent='▾');

@@ -615,7 +615,7 @@ function renderClientSelect(){
           check = ` <span style="color:#B4432B; font-weight:700;">⚠️ Faltó el ${escapeHtml(pendienteInfo.diaQueFalto)} (semana del ${escapeHtml(pendienteInfo.semanaDel)})</span>`;
         }
       } else if(registroSemana){
-        const esOk = registroSemana.resultado === 'Se limpió y se desagotó';
+        const esOk = registroSemana.resultado === 'Se limpió y se desagotó' || registroSemana.resultado === 'Baño entregado';
         const color = esOk ? 'var(--green)' : '#C0392B';
         const marca = esOk ? '✓' : '⚠️';
         const textoResultado = registroSemana.resultado || '(sin resultado cargado)';
@@ -1573,12 +1573,13 @@ function renderHistory(){
 
     const coloresResultado = {
       'Se limpió y se desagotó': 'var(--green)',
+      'Baño entregado': 'var(--green)',
       'Se limpió pero no se pudo desagotar': 'var(--amber)',
       'Cerrado': '#B4432B',
       'Sin acceso': '#B4432B',
       'Cliente pidió reprogramar': '#8A6D3B'
     };
-    const opcionesResultado = ['Se limpió y se desagotó', 'Se limpió pero no se pudo desagotar', 'Cerrado', 'Sin acceso', 'Cliente pidió reprogramar'];
+    const opcionesResultado = ['Se limpió y se desagotó', 'Baño entregado', 'Se limpió pero no se pudo desagotar', 'Cerrado', 'Sin acceso', 'Cliente pidió reprogramar'];
     const resultadoTexto = rec.resultado || 'Se limpió y se desagotó'; // registros viejos sin este dato
     const colorResultado = coloresResultado[resultadoTexto] || '#8A9793';
     const opcionesHtml = opcionesResultado.map(op => `<option value="${escapeHtml(op)}" ${op===resultadoTexto?'selected':''}>${escapeHtml(op)}</option>`).join('');

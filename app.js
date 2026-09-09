@@ -783,6 +783,22 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
   nombreLine.innerHTML = label;
   div.appendChild(nombreLine);
 
+  // Cualquier nota "suelta" que no sea de las de color (Retirar/Suspendido,
+  // que ya se ven arriba en marcaTexto) — para que no quede escondida y haya
+  // que tocar "✏️ Observaciones" para verla. Como suelen ser cortitas, entran
+  // bien en una línea.
+  const piezasObsGenericas = (c.observacion || '').split('|').map(p => p.trim()).filter(p => {
+    if (!p) return false;
+    const pl = p.toLowerCase();
+    return pl.indexOf('retirar') !== 0 && pl.indexOf('suspendido') !== 0;
+  });
+  if(piezasObsGenericas.length > 0){
+    const obsLine = document.createElement('div');
+    obsLine.style.cssText = 'font-size:12px; color:#5B7A73; margin-top:2px; font-style:italic;';
+    obsLine.textContent = '📝 ' + piezasObsGenericas.join(' | ');
+    div.appendChild(obsLine);
+  }
+
   // Fecha de pago actual, para que se vea de un vistazo si está al día o
   // atrasado antes de decidir si tocar "Sumar 1 mes". Si este cliente ya
   // apareció antes en otro grupo de día, no la repetimos.

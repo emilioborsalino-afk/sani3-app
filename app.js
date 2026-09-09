@@ -1222,7 +1222,7 @@ function renderClientList(){
   // que Obradores, para que quede ordenado.
   const deudaFiltrada = empresasConDeuda.filter(o => !filtro || o.nombre.toLowerCase().includes(filtro));
   if(deudaFiltrada.length > 0){
-    renderSeccionPago(wrap, '⚠️ Empresas con deuda', deudaFiltrada, 'Registro Alquileres', '#C97A5A', '#8A3E2A', filtro);
+    renderSeccionPago(wrap, '⚠️ Empresas con deuda', deudaFiltrada, 'Registro Alquileres', '#E8C89A', 'var(--amber)', filtro);
   }
 
   // Sección aparte, al final, para "Obradores" — es un caso distinto (no

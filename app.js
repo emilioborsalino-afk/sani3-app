@@ -9,6 +9,7 @@ let clients = [];
 let records = [];
 let pendientesSemana = []; // lista de "Pendientes de esta semana" (viene de la planilla, se muestra como grupo extra)
 let obradores = []; // clientes de la hoja "Obradores" (pagos), separados del resto
+let empresasConDeuda = []; // sección "Empresas con deuda" de Registro Alquileres, separada del resto
 let config = { companyName: 'Sani3' };
 let ubicacionActual = null;      // {lat, lon} de la última vez que se consiguió bien
 let obsFotosTemp = {};           // fotos de observación ya procesadas, esperando a que se guarden
@@ -21,6 +22,7 @@ const CLIENTS_CACHE_KEY = 'sani3_clients_cache';
 const RECORDS_CACHE_KEY = 'sani3_records_cache';
 const PENDIENTES_SEMANA_CACHE_KEY = 'sani3_pendientes_semana_cache';
 const OBRADORES_CACHE_KEY = 'sani3_obradores_cache';
+const DEUDA_CACHE_KEY = 'sani3_deuda_cache';
 const PENDING_KEY = 'sani3_pending_queue';
 
 function guardarCacheLocal(){
@@ -29,6 +31,7 @@ function guardarCacheLocal(){
     localStorage.setItem(RECORDS_CACHE_KEY, JSON.stringify({ records, guardadoEn: new Date().toISOString() }));
     localStorage.setItem(PENDIENTES_SEMANA_CACHE_KEY, JSON.stringify({ pendientesSemana, guardadoEn: new Date().toISOString() }));
     localStorage.setItem(OBRADORES_CACHE_KEY, JSON.stringify({ obradores, guardadoEn: new Date().toISOString() }));
+    localStorage.setItem(DEUDA_CACHE_KEY, JSON.stringify({ empresasConDeuda, guardadoEn: new Date().toISOString() }));
   }catch(err){ /* si no entra en el almacenamiento del celular, no pasa nada grave */ }
 }
 
@@ -51,6 +54,10 @@ function cargarCacheLocal(){
     const obradoresGuardados = localStorage.getItem(OBRADORES_CACHE_KEY);
     if(obradoresGuardados){
       obradores = JSON.parse(obradoresGuardados).obradores || [];
+    }
+    const deudaGuardada = localStorage.getItem(DEUDA_CACHE_KEY);
+    if(deudaGuardada){
+      empresasConDeuda = JSON.parse(deudaGuardada).empresasConDeuda || [];
     }
     const fecha = new Date(parsedClientes.guardadoEn);
     return fecha.toLocaleDateString('es-AR') + ' ' + fecha.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
@@ -302,6 +309,7 @@ async function loadAll(){
     records = await backendGet('records');
     try{ pendientesSemana = await backendGet('pendientesSemana'); }catch(errPend){ /* si falla, seguimos sin el listado extra, no es crítico */ }
     try{ obradores = await backendGet('obradores'); }catch(errObr){ /* si falla, no es crítico, la sección de Obradores queda vacía */ }
+    try{ empresasConDeuda = await backendGet('empresasConDeuda'); }catch(errDeuda){ /* si falla, no es crítico */ }
     guardarCacheLocal();
     fusionarPendientesEnRecords();
 
@@ -907,6 +915,65 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
       btnMonto.disabled = false;
     };
     acciones.appendChild(btnMonto);
+
+    // Botón para "cortar" la fila y moverla al final de la lista de
+    // clientes — para cuando alguien se retiró y no querés que siga
+    // apareciendo mezclado con los activos, pero sin borrar su fila.
+    const btnCortar = document.createElement('button');
+    btnCortar.textContent = '✂️ Cortar';
+    btnCortar.style.color = '#8A3E2A';
+    btnCortar.onclick = async ()=>{
+      if(!confirm('¿Cortar la fila de "' + c.nombre + '" y moverla al final de la lista de clientes?\n\nEsto es para cuando alguien se retiró — no se borra nada, solo se corre al final.')) return;
+      const textoOriginal = btnCortar.textContent;
+      btnCortar.textContent = 'Moviendo...';
+      btnCortar.disabled = true;
+      try{
+        const resultado = await backendPost({ action:'cortarClienteAlFinal', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '' });
+        if(resultado && resultado.error){
+          setStatus('No se pudo cortar a ' + c.nombre + ': ' + resultado.error, 'err');
+          btnCortar.textContent = textoOriginal;
+          btnCortar.disabled = false;
+        } else {
+          setStatus(c.nombre + ' se movió al final de la lista.', 'ok');
+          await loadAll();
+        }
+      }catch(err){
+        setStatus('No se pudo cortar a ' + c.nombre + ': ' + err.message, 'err');
+        btnCortar.textContent = textoOriginal;
+        btnCortar.disabled = false;
+      }
+    };
+    acciones.appendChild(btnCortar);
+
+    // Segundo botón: en vez de al final de todo, lo manda directo a la
+    // sección "Empresas con deuda" — para cuando alguien se retira
+    // DEBIENDO, y conviene dejarlo anotado ahí en vez de mezclado con los
+    // que se fueron al día.
+    const btnADeuda = document.createElement('button');
+    btnADeuda.textContent = '💳 A Deuda';
+    btnADeuda.style.color = '#8A3E2A';
+    btnADeuda.onclick = async ()=>{
+      if(!confirm('¿Cortar la fila de "' + c.nombre + '" y moverla a "Empresas con deuda"?\n\nEsto es para cuando alguien se retira debiendo — no se borra nada.')) return;
+      const textoOriginal = btnADeuda.textContent;
+      btnADeuda.textContent = 'Moviendo...';
+      btnADeuda.disabled = true;
+      try{
+        const resultado = await backendPost({ action:'cortarClienteADeuda', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '' });
+        if(resultado && resultado.error){
+          setStatus('No se pudo mover a ' + c.nombre + ': ' + resultado.error, 'err');
+          btnADeuda.textContent = textoOriginal;
+          btnADeuda.disabled = false;
+        } else {
+          setStatus(c.nombre + ' se movió a "Empresas con deuda".', 'ok');
+          await loadAll();
+        }
+      }catch(err){
+        setStatus('No se pudo mover a ' + c.nombre + ': ' + err.message, 'err');
+        btnADeuda.textContent = textoOriginal;
+        btnADeuda.disabled = false;
+      }
+    };
+    acciones.appendChild(btnADeuda);
   }
 
   // Botón para ver/editar/borrar el texto de la observación a mano, sin
@@ -1167,137 +1234,52 @@ function renderClientList(){
   seccionesObr.forEach(sec=>{
     const lista = porSeccion[sec];
     const esDeuda = sec.toLowerCase().indexOf('deuda') !== -1;
-
-    const sectionObr = document.createElement('div');
-    sectionObr.style.cssText = 'border:1px solid ' + (esDeuda ? '#C97A5A' : '#C9C2B8') + '; border-radius:8px; margin-top:14px; overflow:hidden;';
-
-    const headerObr = document.createElement('button');
-    headerObr.type = 'button';
-    headerObr.style.cssText = 'width:100%; text-align:left; background:' + (esDeuda ? '#8A3E2A' : '#5B5347') + '; color:#fff; padding:11px 14px; font-family:var(--disp); font-weight:700; font-size:14px; border:none; display:flex; justify-content:space-between; align-items:center; cursor:pointer;';
-    const labelObr = document.createElement('span');
-    labelObr.textContent = (esDeuda ? '⚠️ ' : '🏗️ ') + sec + ` (${lista.length})`;
-    const arrowObr = document.createElement('span');
-    arrowObr.textContent = filtro ? '▴' : '▾';
-    headerObr.appendChild(labelObr);
-    headerObr.appendChild(arrowObr);
-
-    const bodyObr = document.createElement('div');
-    bodyObr.style.cssText = 'background:#fff; padding:8px; display:' + (filtro ? 'block' : 'none') + ';';
-
-    lista.forEach(o=>{
-      const div = document.createElement('div');
-      div.className = 'client-chip';
-
-      const nombreLine = document.createElement('div');
-      nombreLine.innerHTML = o.direccion
-        ? `${escapeHtml(o.nombre)} <span style="color:#8A9793;">— ${escapeHtml(o.direccion)}</span>`
-        : escapeHtml(o.nombre);
-      div.appendChild(nombreLine);
-
-      if(o.observacion){
-        const obsLine = document.createElement('div');
-        obsLine.style.cssText = 'font-size:12px; color:#5B7A73; margin-top:2px; font-style:italic;';
-        obsLine.textContent = '📝 ' + o.observacion;
-        div.appendChild(obsLine);
-      }
-
-      const pagoLine = document.createElement('div');
-      pagoLine.style.cssText = 'font-size:12px; color:#8A9793; margin-top:2px;';
-      pagoLine.textContent = formatearLineaPago(o);
-      div.appendChild(pagoLine);
-
-      const acciones = document.createElement('div');
-      acciones.className = 'client-chip-acciones';
-
-      const btnPago = document.createElement('button');
-      btnPago.textContent = '💰 Sumar 1 mes';
-      btnPago.style.color = '#1E7A4C';
-      btnPago.onclick = async ()=>{
-        if(!confirm('¿Sumarle 1 mes a la fecha de pago de "' + o.nombre + '"?\n\nPago actual: ' + (o.pagoFecha || 'nunca se cargó'))) return;
-        const textoOriginal = btnPago.textContent;
-        btnPago.textContent = 'Guardando...';
-        btnPago.disabled = true;
-        try{
-          const resultado = await backendPost({ action:'sumarUnMesPago', hoja:'Obradores', nombre: o.nombre, direccion: o.direccion || '' });
-          if(resultado && resultado.error){
-            setStatus('No se pudo actualizar el pago de ' + o.nombre + ': ' + resultado.error, 'err');
-          } else {
-            o.pagoFecha = resultado.nuevaFecha;
-            pagoLine.textContent = formatearLineaPago(o);
-            setStatus('Pago de ' + o.nombre + ': pasó del ' + resultado.fechaAnterior + ' al ' + resultado.nuevaFecha + '.', 'ok');
-          }
-        }catch(err){
-          setStatus('No se pudo actualizar el pago de ' + o.nombre + ': ' + err.message, 'err');
-        }
-        btnPago.textContent = textoOriginal;
-        btnPago.disabled = false;
-      };
-      acciones.appendChild(btnPago);
-
-      const btnMonto = document.createElement('button');
-      btnMonto.textContent = '✏️ Monto';
-      btnMonto.style.color = '#8A6D3B';
-      btnMonto.onclick = async ()=>{
-        const nuevoTexto = prompt('Monto de "' + o.nombre + '" (podés escribirlo como quieras, por ejemplo 50000 o 50.000,00):', o.monto || '');
-        if(nuevoTexto === null || nuevoTexto.trim() === '') return;
-        const textoOriginal = btnMonto.textContent;
-        btnMonto.textContent = 'Guardando...';
-        btnMonto.disabled = true;
-        try{
-          const resultado = await backendPost({ action:'actualizarMontoPago', hoja:'Obradores', nombre: o.nombre, direccion: o.direccion || '', monto: nuevoTexto });
-          if(resultado && resultado.error){
-            setStatus('No se pudo actualizar el monto de ' + o.nombre + ': ' + resultado.error, 'err');
-          } else {
-            o.monto = resultado.monto;
-            pagoLine.textContent = formatearLineaPago(o);
-            setStatus('Monto de ' + o.nombre + ' actualizado a ' + o.monto + '.', 'ok');
-          }
-        }catch(err){
-          setStatus('No se pudo actualizar el monto de ' + o.nombre + ': ' + err.message, 'err');
-        }
-        btnMonto.textContent = textoOriginal;
-        btnMonto.disabled = false;
-      };
-      acciones.appendChild(btnMonto);
-
-      const btnObs = document.createElement('button');
-      btnObs.textContent = '✏️ Observaciones';
-      btnObs.style.color = '#5B7A73';
-      btnObs.onclick = async ()=>{
-        const nuevoTexto = prompt('Observación de "' + o.nombre + '" (podés editarla o borrarla del todo):', o.observacion || '');
-        if(nuevoTexto === null) return;
-        const textoOriginal = btnObs.textContent;
-        btnObs.textContent = 'Guardando...';
-        btnObs.disabled = true;
-        try{
-          await backendPost({ action:'actualizarObservacionCliente', hoja:'Obradores', nombre: o.nombre, direccion: o.direccion || '', texto: nuevoTexto });
-          o.observacion = nuevoTexto.trim();
-          setStatus('Observación de ' + o.nombre + ' actualizada.', 'ok');
-          renderClientList();
-          return;
-        }catch(err){
-          setStatus('No se pudo guardar la observación: ' + err.message, 'err');
-        }
-        btnObs.textContent = textoOriginal;
-        btnObs.disabled = false;
-      };
-      acciones.appendChild(btnObs);
-
-      div.appendChild(acciones);
-      bodyObr.appendChild(div);
-    });
-
-    headerObr.onclick = ()=>{
-      const isOpen = bodyObr.style.display === 'block';
-      bodyObr.style.display = isOpen ? 'none' : 'block';
-      arrowObr.textContent = isOpen ? '▾' : '▴';
-    };
-
-    sectionObr.appendChild(headerObr);
-    sectionObr.appendChild(bodyObr);
-    wrap.appendChild(sectionObr);
+    renderSeccionPago(wrap, (esDeuda ? '⚠️ ' : '🏗️ ') + sec, lista, 'Obradores', esDeuda ? '#C97A5A' : '#C9C2B8', esDeuda ? '#8A3E2A' : '#5B5347', filtro);
   });
+
+  // Sección "Empresas con deuda" de Registro Alquileres — la planilla ya
+  // la salta a propósito para el listado principal (por día), así que la
+  // mostramos acá aparte, con las mismas acciones que el resto.
+  const deudaFiltrada = empresasConDeuda.filter(o => !filtro || o.nombre.toLowerCase().includes(filtro));
+  if(deudaFiltrada.length > 0){
+    renderSeccionPago(wrap, '⚠️ Empresas con deuda', deudaFiltrada, 'Registro Alquileres', '#C97A5A', '#8A3E2A', filtro);
+  }
 }
+
+// Dibuja una sección colapsable con una lista de clientes armados con
+// crearFilaPagoGenerica — se usa para Obradores y para Empresas con deuda.
+function renderSeccionPago(wrap, titulo, lista, hojaDestino, colorBorde, colorHeader, filtro){
+  const section = document.createElement('div');
+  section.style.cssText = 'border:1px solid ' + colorBorde + '; border-radius:8px; margin-top:14px; overflow:hidden;';
+
+  const header = document.createElement('button');
+  header.type = 'button';
+  header.style.cssText = 'width:100%; text-align:left; background:' + colorHeader + '; color:#fff; padding:11px 14px; font-family:var(--disp); font-weight:700; font-size:14px; border:none; display:flex; justify-content:space-between; align-items:center; cursor:pointer;';
+  const label = document.createElement('span');
+  label.textContent = titulo + ` (${lista.length})`;
+  const arrow = document.createElement('span');
+  arrow.textContent = filtro ? '▴' : '▾';
+  header.appendChild(label);
+  header.appendChild(arrow);
+
+  const body = document.createElement('div');
+  body.style.cssText = 'background:#fff; padding:8px; display:' + (filtro ? 'block' : 'none') + ';';
+
+  lista.forEach(o=>{
+    body.appendChild(crearFilaPagoGenerica(o, hojaDestino));
+  });
+
+  header.onclick = ()=>{
+    const isOpen = body.style.display === 'block';
+    body.style.display = isOpen ? 'none' : 'block';
+    arrow.textContent = isOpen ? '▾' : '▴';
+  };
+
+  section.appendChild(header);
+  section.appendChild(body);
+  wrap.appendChild(section);
+}
+
 
 if(document.getElementById('clientListSearchInput')){
   document.getElementById('clientListSearchInput').oninput = ()=> renderClientList();
@@ -1530,6 +1512,170 @@ function formatearLineaPago(obj){
   if(obj.monto) texto += ' — ' + obj.monto;
   if(obj.vencimiento) texto += ' (' + obj.vencimiento + ')';
   return texto;
+}
+
+// Arma una fila completa (nombre, observación, pago, y los botones de
+// Sumar 1 mes / Monto / Observaciones / Dar de baja) para un cliente que
+// viene de "Obradores" o de "Empresas con deuda" — ambos comparten la
+// misma pinta y las mismas acciones, cambia nada más que la hoja de
+// destino en la planilla.
+function crearFilaPagoGenerica(o, hojaDestino){
+  const div = document.createElement('div');
+  div.className = 'client-chip';
+
+  const nombreLine = document.createElement('div');
+  nombreLine.innerHTML = o.direccion
+    ? `${escapeHtml(o.nombre)} <span style="color:#8A9793;">— ${escapeHtml(o.direccion)}</span>`
+    : escapeHtml(o.nombre);
+  div.appendChild(nombreLine);
+
+  if(o.observacion){
+    const obsLine = document.createElement('div');
+    obsLine.style.cssText = 'font-size:12px; color:#5B7A73; margin-top:2px; font-style:italic;';
+    obsLine.textContent = '📝 ' + o.observacion;
+    div.appendChild(obsLine);
+  }
+
+  const pagoLine = document.createElement('div');
+  pagoLine.style.cssText = 'font-size:12px; color:#8A9793; margin-top:2px;';
+  pagoLine.textContent = formatearLineaPago(o);
+  div.appendChild(pagoLine);
+
+  const acciones = document.createElement('div');
+  acciones.className = 'client-chip-acciones';
+
+  const btnPago = document.createElement('button');
+  btnPago.textContent = '💰 Sumar 1 mes';
+  btnPago.style.color = '#1E7A4C';
+  btnPago.onclick = async ()=>{
+    if(!confirm('¿Sumarle 1 mes a la fecha de pago de "' + o.nombre + '"?\n\nPago actual: ' + (o.pagoFecha || 'nunca se cargó'))) return;
+    const textoOriginal = btnPago.textContent;
+    btnPago.textContent = 'Guardando...';
+    btnPago.disabled = true;
+    try{
+      const resultado = await backendPost({ action:'sumarUnMesPago', hoja:hojaDestino, nombre: o.nombre, direccion: o.direccion || '' });
+      if(resultado && resultado.error){
+        setStatus('No se pudo actualizar el pago de ' + o.nombre + ': ' + resultado.error, 'err');
+      } else {
+        o.pagoFecha = resultado.nuevaFecha;
+        pagoLine.textContent = formatearLineaPago(o);
+        setStatus('Pago de ' + o.nombre + ': pasó del ' + resultado.fechaAnterior + ' al ' + resultado.nuevaFecha + '.', 'ok');
+      }
+    }catch(err){
+      setStatus('No se pudo actualizar el pago de ' + o.nombre + ': ' + err.message, 'err');
+    }
+    btnPago.textContent = textoOriginal;
+    btnPago.disabled = false;
+  };
+  acciones.appendChild(btnPago);
+
+  const btnMonto = document.createElement('button');
+  btnMonto.textContent = '✏️ Monto';
+  btnMonto.style.color = '#8A6D3B';
+  btnMonto.onclick = async ()=>{
+    const nuevoTexto = prompt('Monto de "' + o.nombre + '" (podés escribirlo como quieras, por ejemplo 50000 o 50.000,00):', o.monto || '');
+    if(nuevoTexto === null || nuevoTexto.trim() === '') return;
+    const textoOriginal = btnMonto.textContent;
+    btnMonto.textContent = 'Guardando...';
+    btnMonto.disabled = true;
+    try{
+      const resultado = await backendPost({ action:'actualizarMontoPago', hoja:hojaDestino, nombre: o.nombre, direccion: o.direccion || '', monto: nuevoTexto });
+      if(resultado && resultado.error){
+        setStatus('No se pudo actualizar el monto de ' + o.nombre + ': ' + resultado.error, 'err');
+      } else {
+        o.monto = resultado.monto;
+        pagoLine.textContent = formatearLineaPago(o);
+        setStatus('Monto de ' + o.nombre + ' actualizado a ' + o.monto + '.', 'ok');
+      }
+    }catch(err){
+      setStatus('No se pudo actualizar el monto de ' + o.nombre + ': ' + err.message, 'err');
+    }
+    btnMonto.textContent = textoOriginal;
+    btnMonto.disabled = false;
+  };
+  acciones.appendChild(btnMonto);
+
+  const btnObs = document.createElement('button');
+  btnObs.textContent = '✏️ Observaciones';
+  btnObs.style.color = '#5B7A73';
+  btnObs.onclick = async ()=>{
+    const nuevoTexto = prompt('Observación de "' + o.nombre + '" (podés editarla o borrarla del todo):', o.observacion || '');
+    if(nuevoTexto === null) return;
+    const textoOriginal = btnObs.textContent;
+    btnObs.textContent = 'Guardando...';
+    btnObs.disabled = true;
+    try{
+      await backendPost({ action:'actualizarObservacionCliente', hoja:hojaDestino, nombre: o.nombre, direccion: o.direccion || '', texto: nuevoTexto });
+      o.observacion = nuevoTexto.trim();
+      setStatus('Observación de ' + o.nombre + ' actualizada.', 'ok');
+      renderClientList();
+      return;
+    }catch(err){
+      setStatus('No se pudo guardar la observación: ' + err.message, 'err');
+    }
+    btnObs.textContent = textoOriginal;
+    btnObs.disabled = false;
+  };
+  acciones.appendChild(btnObs);
+
+  const btnCortar = document.createElement('button');
+  btnCortar.textContent = '✂️ Cortar';
+  btnCortar.style.color = '#8A3E2A';
+  btnCortar.onclick = async ()=>{
+    if(!confirm('¿Cortar la fila de "' + o.nombre + '" y moverla al final de la lista?\n\nEsto es para cuando alguien se retiró — no se borra nada, solo se corre al final.')) return;
+    const textoOriginal = btnCortar.textContent;
+    btnCortar.textContent = 'Moviendo...';
+    btnCortar.disabled = true;
+    try{
+      const resultado = await backendPost({ action:'cortarClienteAlFinal', hoja:hojaDestino, nombre: o.nombre, direccion: o.direccion || '' });
+      if(resultado && resultado.error){
+        setStatus('No se pudo cortar a ' + o.nombre + ': ' + resultado.error, 'err');
+        btnCortar.textContent = textoOriginal;
+        btnCortar.disabled = false;
+      } else {
+        setStatus(o.nombre + ' se movió al final de la planilla.', 'ok');
+        div.remove();
+      }
+    }catch(err){
+      setStatus('No se pudo cortar a ' + o.nombre + ': ' + err.message, 'err');
+      btnCortar.textContent = textoOriginal;
+      btnCortar.disabled = false;
+    }
+  };
+  acciones.appendChild(btnCortar);
+
+  // Segundo botón: manda directo a la sección de deuda de esta hoja
+  // ("Empresas con deuda" en Registro Alquileres, "Clientes con deuda" en
+  // Obradores) en vez de al final de todo — para cuando se retira
+  // debiendo.
+  const btnADeuda = document.createElement('button');
+  btnADeuda.textContent = '💳 A Deuda';
+  btnADeuda.style.color = '#8A3E2A';
+  btnADeuda.onclick = async ()=>{
+    if(!confirm('¿Cortar la fila de "' + o.nombre + '" y moverla a la sección de deuda?\n\nEsto es para cuando se retira debiendo — no se borra nada.')) return;
+    const textoOriginal = btnADeuda.textContent;
+    btnADeuda.textContent = 'Moviendo...';
+    btnADeuda.disabled = true;
+    try{
+      const resultado = await backendPost({ action:'cortarClienteADeuda', hoja:hojaDestino, nombre: o.nombre, direccion: o.direccion || '' });
+      if(resultado && resultado.error){
+        setStatus('No se pudo mover a ' + o.nombre + ': ' + resultado.error, 'err');
+        btnADeuda.textContent = textoOriginal;
+        btnADeuda.disabled = false;
+      } else {
+        setStatus(o.nombre + ' se movió a la sección de deuda.', 'ok');
+        div.remove();
+      }
+    }catch(err){
+      setStatus('No se pudo mover a ' + o.nombre + ': ' + err.message, 'err');
+      btnADeuda.textContent = textoOriginal;
+      btnADeuda.disabled = false;
+    }
+  };
+  acciones.appendChild(btnADeuda);
+
+  div.appendChild(acciones);
+  return div;
 }
 
 // --- Registrar visita ---

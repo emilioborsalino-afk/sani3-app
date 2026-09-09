@@ -810,6 +810,44 @@ function crearFilaCliente(c, i, grupo){
   };
   acciones.appendChild(btnLink);
 
+  // Botón para ver/editar/borrar el texto de la observación a mano, sin
+  // depender de los flujos de "Retirar"/"Suspendido" — útil sobre todo para
+  // los clientes de reserva, donde cambiar el color NO limpia solo una nota
+  // vieja (por ejemplo un "Suspendido..." que quedó pegado del pasado). Solo
+  // para el dueño, como en la app de empleados no hace falta.
+  if(!window.MODO_EMPLEADO){
+    const btnNota = document.createElement('button');
+    btnNota.textContent = '✏️ Observaciones';
+    btnNota.style.color = '#5B7A73';
+    btnNota.onclick = async ()=>{
+      const nuevoTexto = prompt(
+        'Observación de "' + c.nombre + '" (podés editarla o borrarla del todo).\n\nSi tiene varias notas juntas, están separadas por " | ".',
+        c.observacion || ''
+      );
+      if(nuevoTexto === null) return; // canceló
+      const textoOriginal = btnNota.textContent;
+      btnNota.textContent = 'Guardando...';
+      btnNota.disabled = true;
+      try{
+        await backendPost({ action:'actualizarObservacionCliente', nombre: c.nombre, direccion: c.direccion || '', texto: nuevoTexto });
+        c.observacion = nuevoTexto.trim();
+        // Recalculamos localmente los indicadores que dependen del texto, para
+        // que se vea bien al toque sin tener que esperar el próximo refresco.
+        const piezas = c.observacion.split('|').map(p=>p.trim().toLowerCase());
+        c.suspendido = (c.marcaRetiro === 'celeste') || piezas.some(p=>p.indexOf('suspendido') === 0);
+        setStatus('Nota actualizada: ' + c.nombre, 'ok');
+        renderClientList();
+        renderClientSelect();
+        return;
+      }catch(err){
+        setStatus('No se pudo guardar la nota: ' + err.message, 'err');
+      }
+      btnNota.textContent = textoOriginal;
+      btnNota.disabled = false;
+    };
+    acciones.appendChild(btnNota);
+  }
+
   if(grupo === 'Otros'){
     // Clientes en "Empresas con reserva": desplegable de color (sin tocar Observaciones), más el botón de borrar de verdad.
     const selectColorReserva = document.createElement('select');

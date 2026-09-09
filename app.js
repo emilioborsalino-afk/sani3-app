@@ -786,17 +786,20 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
   // Cualquier nota "suelta" que no sea de las de color (Retirar/Suspendido,
   // que ya se ven arriba en marcaTexto) — para que no quede escondida y haya
   // que tocar "✏️ Observaciones" para verla. Como suelen ser cortitas, entran
-  // bien en una línea.
-  const piezasObsGenericas = (c.observacion || '').split('|').map(p => p.trim()).filter(p => {
-    if (!p) return false;
-    const pl = p.toLowerCase();
-    return pl.indexOf('retirar') !== 0 && pl.indexOf('suspendido') !== 0;
-  });
-  if(piezasObsGenericas.length > 0){
-    const obsLine = document.createElement('div');
-    obsLine.style.cssText = 'font-size:12px; color:#5B7A73; margin-top:2px; font-style:italic;';
-    obsLine.textContent = '📝 ' + piezasObsGenericas.join(' | ');
-    div.appendChild(obsLine);
+  // bien en una línea. Solo la primera vez que aparece el cliente (si tiene
+  // varios días, no la repetimos en cada uno — es la misma nota, una sola).
+  if(mostrarPago){
+    const piezasObsGenericas = (c.observacion || '').split('|').map(p => p.trim()).filter(p => {
+      if (!p) return false;
+      const pl = p.toLowerCase();
+      return pl.indexOf('retirar') !== 0 && pl.indexOf('suspendido') !== 0;
+    });
+    if(piezasObsGenericas.length > 0){
+      const obsLine = document.createElement('div');
+      obsLine.style.cssText = 'font-size:12px; color:#5B7A73; margin-top:2px; font-style:italic;';
+      obsLine.textContent = '📝 ' + piezasObsGenericas.join(' | ');
+      div.appendChild(obsLine);
+    }
   }
 
   // Fecha de pago actual, para que se vea de un vistazo si está al día o
@@ -806,7 +809,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
   if(mostrarPago){
     pagoLine = document.createElement('div');
     pagoLine.style.cssText = 'font-size:12px; color:#8A9793; margin-top:2px;';
-    pagoLine.textContent = (c.pagoFecha ? ('💵 Pago: ' + c.pagoFecha) : '💵 Pago: nunca se cargó') + (c.monto ? (' — ' + c.monto) : '');
+    pagoLine.textContent = formatearLineaPago(c);
     div.appendChild(pagoLine);
   }
 
@@ -867,7 +870,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
           setStatus('No se pudo actualizar el pago de ' + c.nombre + ': ' + resultado.error, 'err');
         } else {
           c.pagoFecha = resultado.nuevaFecha;
-          pagoLine.textContent = (c.pagoFecha ? ('💵 Pago: ' + c.pagoFecha) : '💵 Pago: nunca se cargó') + (c.monto ? (' — ' + c.monto) : '');
+          pagoLine.textContent = formatearLineaPago(c);
           setStatus('Pago de ' + c.nombre + ': pasó del ' + resultado.fechaAnterior + ' al ' + resultado.nuevaFecha + '.', 'ok');
         }
       }catch(err){
@@ -894,7 +897,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
           setStatus('No se pudo actualizar el monto de ' + c.nombre + ': ' + resultado.error, 'err');
         } else {
           c.monto = resultado.monto;
-          pagoLine.textContent = (c.pagoFecha ? ('💵 Pago: ' + c.pagoFecha) : '💵 Pago: nunca se cargó') + (c.monto ? (' — ' + c.monto) : '');
+          pagoLine.textContent = formatearLineaPago(c);
           setStatus('Monto de ' + c.nombre + ' actualizado a ' + c.monto + '.', 'ok');
         }
       }catch(err){
@@ -925,7 +928,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
       btnNota.textContent = 'Guardando...';
       btnNota.disabled = true;
       try{
-        await backendPost({ action:'actualizarObservacionCliente', nombre: c.nombre, direccion: c.direccion || '', texto: nuevoTexto });
+        await backendPost({ action:'actualizarObservacionCliente', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', texto: nuevoTexto });
         c.observacion = nuevoTexto.trim();
         // Recalculamos localmente los indicadores que dependen del texto, para
         // que se vea bien al toque sin tener que esperar el próximo refresco.
@@ -1148,17 +1151,31 @@ function renderClientList(){
 
   // Sección aparte, al final, para "Obradores" — es un caso distinto (no
   // forma parte del circuito de limpiezas de baños), separado bien del
-  // resto para no mezclarlo, pero con el mismo botón de "Sumar 1 mes".
+  // resto para no mezclarlo, pero con el mismo botón de "Sumar 1 mes". A su
+  // vez, "Obradores" tiene sus propias sub-secciones en la planilla (por
+  // ejemplo "Clientes con deuda") — las respetamos con su propio título,
+  // en vez de mezclar todo en una sola lista.
   const obradoresFiltrados = obradores.filter(o => !filtro || o.nombre.toLowerCase().includes(filtro));
-  if(obradoresFiltrados.length > 0){
+  const seccionesObr = []; // orden de aparición de cada sección distinta
+  const porSeccion = {};
+  obradoresFiltrados.forEach(o=>{
+    const sec = o.seccion || 'Obradores';
+    if(!porSeccion[sec]){ porSeccion[sec] = []; seccionesObr.push(sec); }
+    porSeccion[sec].push(o);
+  });
+
+  seccionesObr.forEach(sec=>{
+    const lista = porSeccion[sec];
+    const esDeuda = sec.toLowerCase().indexOf('deuda') !== -1;
+
     const sectionObr = document.createElement('div');
-    sectionObr.style.cssText = 'border:1px solid #C9C2B8; border-radius:8px; margin-top:14px; overflow:hidden;';
+    sectionObr.style.cssText = 'border:1px solid ' + (esDeuda ? '#C97A5A' : '#C9C2B8') + '; border-radius:8px; margin-top:14px; overflow:hidden;';
 
     const headerObr = document.createElement('button');
     headerObr.type = 'button';
-    headerObr.style.cssText = 'width:100%; text-align:left; background:#5B5347; color:#fff; padding:11px 14px; font-family:var(--disp); font-weight:700; font-size:14px; border:none; display:flex; justify-content:space-between; align-items:center; cursor:pointer;';
+    headerObr.style.cssText = 'width:100%; text-align:left; background:' + (esDeuda ? '#8A3E2A' : '#5B5347') + '; color:#fff; padding:11px 14px; font-family:var(--disp); font-weight:700; font-size:14px; border:none; display:flex; justify-content:space-between; align-items:center; cursor:pointer;';
     const labelObr = document.createElement('span');
-    labelObr.textContent = '🏗️ Obradores' + ` (${obradoresFiltrados.length})`;
+    labelObr.textContent = (esDeuda ? '⚠️ ' : '🏗️ ') + sec + ` (${lista.length})`;
     const arrowObr = document.createElement('span');
     arrowObr.textContent = filtro ? '▴' : '▾';
     headerObr.appendChild(labelObr);
@@ -1167,7 +1184,7 @@ function renderClientList(){
     const bodyObr = document.createElement('div');
     bodyObr.style.cssText = 'background:#fff; padding:8px; display:' + (filtro ? 'block' : 'none') + ';';
 
-    obradoresFiltrados.forEach(o=>{
+    lista.forEach(o=>{
       const div = document.createElement('div');
       div.className = 'client-chip';
 
@@ -1177,9 +1194,16 @@ function renderClientList(){
         : escapeHtml(o.nombre);
       div.appendChild(nombreLine);
 
+      if(o.observacion){
+        const obsLine = document.createElement('div');
+        obsLine.style.cssText = 'font-size:12px; color:#5B7A73; margin-top:2px; font-style:italic;';
+        obsLine.textContent = '📝 ' + o.observacion;
+        div.appendChild(obsLine);
+      }
+
       const pagoLine = document.createElement('div');
       pagoLine.style.cssText = 'font-size:12px; color:#8A9793; margin-top:2px;';
-      pagoLine.textContent = (o.pagoFecha ? ('💵 Pago: ' + o.pagoFecha) : '💵 Pago: nunca se cargó') + (o.monto ? (' — ' + o.monto) : '');
+      pagoLine.textContent = formatearLineaPago(o);
       div.appendChild(pagoLine);
 
       const acciones = document.createElement('div');
@@ -1199,7 +1223,7 @@ function renderClientList(){
             setStatus('No se pudo actualizar el pago de ' + o.nombre + ': ' + resultado.error, 'err');
           } else {
             o.pagoFecha = resultado.nuevaFecha;
-            pagoLine.textContent = (o.pagoFecha ? ('💵 Pago: ' + o.pagoFecha) : '💵 Pago: nunca se cargó') + (o.monto ? (' — ' + o.monto) : '');
+            pagoLine.textContent = formatearLineaPago(o);
             setStatus('Pago de ' + o.nombre + ': pasó del ' + resultado.fechaAnterior + ' al ' + resultado.nuevaFecha + '.', 'ok');
           }
         }catch(err){
@@ -1225,7 +1249,7 @@ function renderClientList(){
             setStatus('No se pudo actualizar el monto de ' + o.nombre + ': ' + resultado.error, 'err');
           } else {
             o.monto = resultado.monto;
-            pagoLine.textContent = (o.pagoFecha ? ('💵 Pago: ' + o.pagoFecha) : '💵 Pago: nunca se cargó') + (o.monto ? (' — ' + o.monto) : '');
+            pagoLine.textContent = formatearLineaPago(o);
             setStatus('Monto de ' + o.nombre + ' actualizado a ' + o.monto + '.', 'ok');
           }
         }catch(err){
@@ -1235,6 +1259,30 @@ function renderClientList(){
         btnMonto.disabled = false;
       };
       acciones.appendChild(btnMonto);
+
+      const btnObs = document.createElement('button');
+      btnObs.textContent = '✏️ Observaciones';
+      btnObs.style.color = '#5B7A73';
+      btnObs.onclick = async ()=>{
+        const nuevoTexto = prompt('Observación de "' + o.nombre + '" (podés editarla o borrarla del todo):', o.observacion || '');
+        if(nuevoTexto === null) return;
+        const textoOriginal = btnObs.textContent;
+        btnObs.textContent = 'Guardando...';
+        btnObs.disabled = true;
+        try{
+          await backendPost({ action:'actualizarObservacionCliente', hoja:'Obradores', nombre: o.nombre, direccion: o.direccion || '', texto: nuevoTexto });
+          o.observacion = nuevoTexto.trim();
+          setStatus('Observación de ' + o.nombre + ' actualizada.', 'ok');
+          renderClientList();
+          return;
+        }catch(err){
+          setStatus('No se pudo guardar la observación: ' + err.message, 'err');
+        }
+        btnObs.textContent = textoOriginal;
+        btnObs.disabled = false;
+      };
+      acciones.appendChild(btnObs);
+
       div.appendChild(acciones);
       bodyObr.appendChild(div);
     });
@@ -1248,7 +1296,7 @@ function renderClientList(){
     sectionObr.appendChild(headerObr);
     sectionObr.appendChild(bodyObr);
     wrap.appendChild(sectionObr);
-  }
+  });
 }
 
 if(document.getElementById('clientListSearchInput')){
@@ -1472,6 +1520,16 @@ if(document.getElementById('empFotoInput')){
 
 function escapeHtml(s){
   return s.replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+// Arma el texto de la línea de pago (fecha, monto, y vencido/al día tal
+// cual lo calcula la planilla) — se usa tanto para Registro Alquileres
+// como para Obradores.
+function formatearLineaPago(obj){
+  let texto = obj.pagoFecha ? ('💵 Pago: ' + obj.pagoFecha) : '💵 Pago: nunca se cargó';
+  if(obj.monto) texto += ' — ' + obj.monto;
+  if(obj.vencimiento) texto += ' (' + obj.vencimiento + ')';
+  return texto;
 }
 
 // --- Registrar visita ---

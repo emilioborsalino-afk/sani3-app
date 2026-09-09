@@ -1216,6 +1216,15 @@ function renderClientList(){
     wrap.appendChild(section);
   });
 
+  // Sección "Empresas con deuda" de Registro Alquileres — la planilla ya
+  // la salta a propósito para el listado principal (por día), así que la
+  // mostramos acá aparte, con las mismas acciones que el resto. Va antes
+  // que Obradores, para que quede ordenado.
+  const deudaFiltrada = empresasConDeuda.filter(o => !filtro || o.nombre.toLowerCase().includes(filtro));
+  if(deudaFiltrada.length > 0){
+    renderSeccionPago(wrap, '⚠️ Empresas con deuda', deudaFiltrada, 'Registro Alquileres', '#C97A5A', '#8A3E2A', filtro);
+  }
+
   // Sección aparte, al final, para "Obradores" — es un caso distinto (no
   // forma parte del circuito de limpiezas de baños), separado bien del
   // resto para no mezclarlo, pero con el mismo botón de "Sumar 1 mes". A su
@@ -1236,14 +1245,6 @@ function renderClientList(){
     const esDeuda = sec.toLowerCase().indexOf('deuda') !== -1;
     renderSeccionPago(wrap, (esDeuda ? '⚠️ ' : '🏗️ ') + sec, lista, 'Obradores', esDeuda ? '#C97A5A' : '#C9C2B8', esDeuda ? '#8A3E2A' : '#5B5347', filtro);
   });
-
-  // Sección "Empresas con deuda" de Registro Alquileres — la planilla ya
-  // la salta a propósito para el listado principal (por día), así que la
-  // mostramos acá aparte, con las mismas acciones que el resto.
-  const deudaFiltrada = empresasConDeuda.filter(o => !filtro || o.nombre.toLowerCase().includes(filtro));
-  if(deudaFiltrada.length > 0){
-    renderSeccionPago(wrap, '⚠️ Empresas con deuda', deudaFiltrada, 'Registro Alquileres', '#C97A5A', '#8A3E2A', filtro);
-  }
 }
 
 // Dibuja una sección colapsable con una lista de clientes armados con

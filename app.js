@@ -752,7 +752,8 @@ function renderClientSelect(){
 }
 
 
-function crearFilaCliente(c, i, grupo){
+function crearFilaCliente(c, i, grupo, mostrarPago){
+  if(mostrarPago === undefined) mostrarPago = true; // por defecto siempre se muestra, salvo que se indique lo contrario
   const div = document.createElement('div');
   div.className = 'client-chip';
   let marcaTexto = '';
@@ -783,11 +784,15 @@ function crearFilaCliente(c, i, grupo){
   div.appendChild(nombreLine);
 
   // Fecha de pago actual, para que se vea de un vistazo si está al día o
-  // atrasado antes de decidir si tocar "Sumar 1 mes".
-  const pagoLine = document.createElement('div');
-  pagoLine.style.cssText = 'font-size:12px; color:#8A9793; margin-top:2px;';
-  pagoLine.textContent = c.pagoFecha ? ('💵 Pago: ' + c.pagoFecha) : '💵 Pago: nunca se cargó';
-  div.appendChild(pagoLine);
+  // atrasado antes de decidir si tocar "Sumar 1 mes". Si este cliente ya
+  // apareció antes en otro grupo de día, no la repetimos.
+  let pagoLine = null;
+  if(mostrarPago){
+    pagoLine = document.createElement('div');
+    pagoLine.style.cssText = 'font-size:12px; color:#8A9793; margin-top:2px;';
+    pagoLine.textContent = (c.pagoFecha ? ('💵 Pago: ' + c.pagoFecha) : '💵 Pago: nunca se cargó') + (c.monto ? (' — ' + c.monto) : '');
+    div.appendChild(pagoLine);
+  }
 
   const acciones = document.createElement('div');
   acciones.className = 'client-chip-acciones';
@@ -829,31 +834,61 @@ function crearFilaCliente(c, i, grupo){
   // que el botón "Sumar 1 mes a la fecha seleccionada" del menú "Pagos" de
   // la planilla, pero desde acá. Sirve para cualquier cliente, no solo los
   // que ya están vencidos — si alguno quiere pagar adelantado, también se
-  // puede usar.
-  const btnPago = document.createElement('button');
-  btnPago.textContent = '💰 Sumar 1 mes';
-  btnPago.style.color = '#1E7A4C';
-  btnPago.onclick = async ()=>{
-    if(!confirm('¿Sumarle 1 mes a la fecha de pago de "' + c.nombre + '"?\n\nPago actual: ' + (c.pagoFecha || 'nunca se cargó'))) return;
-    const textoOriginal = btnPago.textContent;
-    btnPago.textContent = 'Guardando...';
-    btnPago.disabled = true;
-    try{
-      const resultado = await backendPost({ action:'sumarUnMesPago', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '' });
-      if(resultado && resultado.error){
-        setStatus('No se pudo actualizar el pago de ' + c.nombre + ': ' + resultado.error, 'err');
-      } else {
-        c.pagoFecha = resultado.nuevaFecha;
-        pagoLine.textContent = '💵 Pago: ' + c.pagoFecha;
-        setStatus('Pago de ' + c.nombre + ': pasó del ' + resultado.fechaAnterior + ' al ' + resultado.nuevaFecha + '.', 'ok');
+  // puede usar. Si este cliente ya apareció antes (tiene varios días), no
+  // repetimos el botón — el pago es uno solo, no uno por día.
+  if(mostrarPago){
+    const btnPago = document.createElement('button');
+    btnPago.textContent = '💰 Sumar 1 mes';
+    btnPago.style.color = '#1E7A4C';
+    btnPago.onclick = async ()=>{
+      if(!confirm('¿Sumarle 1 mes a la fecha de pago de "' + c.nombre + '"?\n\nPago actual: ' + (c.pagoFecha || 'nunca se cargó'))) return;
+      const textoOriginal = btnPago.textContent;
+      btnPago.textContent = 'Guardando...';
+      btnPago.disabled = true;
+      try{
+        const resultado = await backendPost({ action:'sumarUnMesPago', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '' });
+        if(resultado && resultado.error){
+          setStatus('No se pudo actualizar el pago de ' + c.nombre + ': ' + resultado.error, 'err');
+        } else {
+          c.pagoFecha = resultado.nuevaFecha;
+          pagoLine.textContent = (c.pagoFecha ? ('💵 Pago: ' + c.pagoFecha) : '💵 Pago: nunca se cargó') + (c.monto ? (' — ' + c.monto) : '');
+          setStatus('Pago de ' + c.nombre + ': pasó del ' + resultado.fechaAnterior + ' al ' + resultado.nuevaFecha + '.', 'ok');
+        }
+      }catch(err){
+        setStatus('No se pudo actualizar el pago de ' + c.nombre + ': ' + err.message, 'err');
       }
-    }catch(err){
-      setStatus('No se pudo actualizar el pago de ' + c.nombre + ': ' + err.message, 'err');
-    }
-    btnPago.textContent = textoOriginal;
-    btnPago.disabled = false;
-  };
-  acciones.appendChild(btnPago);
+      btnPago.textContent = textoOriginal;
+      btnPago.disabled = false;
+    };
+    acciones.appendChild(btnPago);
+
+    // Botón para cambiar el monto (Valor de contratación) de este cliente.
+    const btnMonto = document.createElement('button');
+    btnMonto.textContent = '✏️ Monto';
+    btnMonto.style.color = '#8A6D3B';
+    btnMonto.onclick = async ()=>{
+      const nuevoTexto = prompt('Monto de "' + c.nombre + '" (podés escribirlo como quieras, por ejemplo 50000 o 50.000,00):', c.monto || '');
+      if(nuevoTexto === null || nuevoTexto.trim() === '') return;
+      const textoOriginal = btnMonto.textContent;
+      btnMonto.textContent = 'Guardando...';
+      btnMonto.disabled = true;
+      try{
+        const resultado = await backendPost({ action:'actualizarMontoPago', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', monto: nuevoTexto });
+        if(resultado && resultado.error){
+          setStatus('No se pudo actualizar el monto de ' + c.nombre + ': ' + resultado.error, 'err');
+        } else {
+          c.monto = resultado.monto;
+          pagoLine.textContent = (c.pagoFecha ? ('💵 Pago: ' + c.pagoFecha) : '💵 Pago: nunca se cargó') + (c.monto ? (' — ' + c.monto) : '');
+          setStatus('Monto de ' + c.nombre + ' actualizado a ' + c.monto + '.', 'ok');
+        }
+      }catch(err){
+        setStatus('No se pudo actualizar el monto de ' + c.nombre + ': ' + err.message, 'err');
+      }
+      btnMonto.textContent = textoOriginal;
+      btnMonto.disabled = false;
+    };
+    acciones.appendChild(btnMonto);
+  }
 
   // Botón para ver/editar/borrar el texto de la observación a mano, sin
   // depender de los flujos de "Retirar"/"Suspendido" — útil sobre todo para
@@ -1048,6 +1083,13 @@ function renderClientList(){
     return;
   }
 
+  // Un cliente con varios días (ej: "Lunes, Miércoles y Viernes") aparece
+  // repetido, una vez por cada grupo de día — eso está bien para elegir el
+  // color o ver el link, pero el pago es UNO SOLO por cliente, así que el
+  // botón de "Sumar 1 mes" (y la fecha de pago) los mostramos nada más que
+  // en la primera vez que aparece, no en cada repetición.
+  const pagoYaMostrado = new Set();
+
   DIAS_CANON.concat(['ProximoRetirar', 'Otros']).forEach(d=>{
     if(grupos[d].length === 0) return;
 
@@ -1072,7 +1114,9 @@ function renderClientList(){
     body.style.cssText = 'background:#fff; padding:8px; display:' + (filtro ? 'block' : 'none') + ';';
 
     grupos[d].forEach(i=>{
-      body.appendChild(crearFilaCliente(clients[i], i, d));
+      const mostrarPago = !pagoYaMostrado.has(i);
+      if(mostrarPago) pagoYaMostrado.add(i);
+      body.appendChild(crearFilaCliente(clients[i], i, d, mostrarPago));
     });
 
     header.onclick = ()=>{
@@ -1119,7 +1163,7 @@ function renderClientList(){
 
       const pagoLine = document.createElement('div');
       pagoLine.style.cssText = 'font-size:12px; color:#8A9793; margin-top:2px;';
-      pagoLine.textContent = o.pagoFecha ? ('💵 Pago: ' + o.pagoFecha) : '💵 Pago: nunca se cargó';
+      pagoLine.textContent = (o.pagoFecha ? ('💵 Pago: ' + o.pagoFecha) : '💵 Pago: nunca se cargó') + (o.monto ? (' — ' + o.monto) : '');
       div.appendChild(pagoLine);
 
       const acciones = document.createElement('div');
@@ -1139,7 +1183,7 @@ function renderClientList(){
             setStatus('No se pudo actualizar el pago de ' + o.nombre + ': ' + resultado.error, 'err');
           } else {
             o.pagoFecha = resultado.nuevaFecha;
-            pagoLine.textContent = '💵 Pago: ' + o.pagoFecha;
+            pagoLine.textContent = (o.pagoFecha ? ('💵 Pago: ' + o.pagoFecha) : '💵 Pago: nunca se cargó') + (o.monto ? (' — ' + o.monto) : '');
             setStatus('Pago de ' + o.nombre + ': pasó del ' + resultado.fechaAnterior + ' al ' + resultado.nuevaFecha + '.', 'ok');
           }
         }catch(err){
@@ -1149,6 +1193,32 @@ function renderClientList(){
         btnPago.disabled = false;
       };
       acciones.appendChild(btnPago);
+
+      const btnMonto = document.createElement('button');
+      btnMonto.textContent = '✏️ Monto';
+      btnMonto.style.color = '#8A6D3B';
+      btnMonto.onclick = async ()=>{
+        const nuevoTexto = prompt('Monto de "' + o.nombre + '" (podés escribirlo como quieras, por ejemplo 50000 o 50.000,00):', o.monto || '');
+        if(nuevoTexto === null || nuevoTexto.trim() === '') return;
+        const textoOriginal = btnMonto.textContent;
+        btnMonto.textContent = 'Guardando...';
+        btnMonto.disabled = true;
+        try{
+          const resultado = await backendPost({ action:'actualizarMontoPago', hoja:'Obradores', nombre: o.nombre, direccion: o.direccion || '', monto: nuevoTexto });
+          if(resultado && resultado.error){
+            setStatus('No se pudo actualizar el monto de ' + o.nombre + ': ' + resultado.error, 'err');
+          } else {
+            o.monto = resultado.monto;
+            pagoLine.textContent = (o.pagoFecha ? ('💵 Pago: ' + o.pagoFecha) : '💵 Pago: nunca se cargó') + (o.monto ? (' — ' + o.monto) : '');
+            setStatus('Monto de ' + o.nombre + ' actualizado a ' + o.monto + '.', 'ok');
+          }
+        }catch(err){
+          setStatus('No se pudo actualizar el monto de ' + o.nombre + ': ' + err.message, 'err');
+        }
+        btnMonto.textContent = textoOriginal;
+        btnMonto.disabled = false;
+      };
+      acciones.appendChild(btnMonto);
       div.appendChild(acciones);
       bodyObr.appendChild(div);
     });

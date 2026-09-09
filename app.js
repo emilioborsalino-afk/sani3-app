@@ -8,6 +8,7 @@ let backendUrl = '';
 let clients = [];
 let records = [];
 let pendientesSemana = []; // lista de "Pendientes de esta semana" (viene de la planilla, se muestra como grupo extra)
+let obradores = []; // clientes de la hoja "Obradores" (pagos), separados del resto
 let config = { companyName: 'Sani3' };
 let ubicacionActual = null;      // {lat, lon} de la última vez que se consiguió bien
 let obsFotosTemp = {};           // fotos de observación ya procesadas, esperando a que se guarden
@@ -19,6 +20,7 @@ const CLIENTES_PRECARGADOS = []; // ya no se usa: los clientes se leen en vivo d
 const CLIENTS_CACHE_KEY = 'sani3_clients_cache';
 const RECORDS_CACHE_KEY = 'sani3_records_cache';
 const PENDIENTES_SEMANA_CACHE_KEY = 'sani3_pendientes_semana_cache';
+const OBRADORES_CACHE_KEY = 'sani3_obradores_cache';
 const PENDING_KEY = 'sani3_pending_queue';
 
 function guardarCacheLocal(){
@@ -26,6 +28,7 @@ function guardarCacheLocal(){
     localStorage.setItem(CLIENTS_CACHE_KEY, JSON.stringify({ clients, guardadoEn: new Date().toISOString() }));
     localStorage.setItem(RECORDS_CACHE_KEY, JSON.stringify({ records, guardadoEn: new Date().toISOString() }));
     localStorage.setItem(PENDIENTES_SEMANA_CACHE_KEY, JSON.stringify({ pendientesSemana, guardadoEn: new Date().toISOString() }));
+    localStorage.setItem(OBRADORES_CACHE_KEY, JSON.stringify({ obradores, guardadoEn: new Date().toISOString() }));
   }catch(err){ /* si no entra en el almacenamiento del celular, no pasa nada grave */ }
 }
 
@@ -44,6 +47,10 @@ function cargarCacheLocal(){
     const pendientesGuardados = localStorage.getItem(PENDIENTES_SEMANA_CACHE_KEY);
     if(pendientesGuardados){
       pendientesSemana = JSON.parse(pendientesGuardados).pendientesSemana || [];
+    }
+    const obradoresGuardados = localStorage.getItem(OBRADORES_CACHE_KEY);
+    if(obradoresGuardados){
+      obradores = JSON.parse(obradoresGuardados).obradores || [];
     }
     const fecha = new Date(parsedClientes.guardadoEn);
     return fecha.toLocaleDateString('es-AR') + ' ' + fecha.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
@@ -294,6 +301,7 @@ async function loadAll(){
     clients = await backendGet('clients');
     records = await backendGet('records');
     try{ pendientesSemana = await backendGet('pendientesSemana'); }catch(errPend){ /* si falla, seguimos sin el listado extra, no es crítico */ }
+    try{ obradores = await backendGet('obradores'); }catch(errObr){ /* si falla, no es crítico, la sección de Obradores queda vacía */ }
     guardarCacheLocal();
     fusionarPendientesEnRecords();
 
@@ -774,6 +782,13 @@ function crearFilaCliente(c, i, grupo){
   nombreLine.innerHTML = label;
   div.appendChild(nombreLine);
 
+  // Fecha de pago actual, para que se vea de un vistazo si está al día o
+  // atrasado antes de decidir si tocar "Sumar 1 mes".
+  const pagoLine = document.createElement('div');
+  pagoLine.style.cssText = 'font-size:12px; color:#8A9793; margin-top:2px;';
+  pagoLine.textContent = c.pagoFecha ? ('💵 Pago: ' + c.pagoFecha) : '💵 Pago: nunca se cargó';
+  div.appendChild(pagoLine);
+
   const acciones = document.createElement('div');
   acciones.className = 'client-chip-acciones';
 
@@ -809,6 +824,36 @@ function crearFilaCliente(c, i, grupo){
     }
   };
   acciones.appendChild(btnLink);
+
+  // Botón para sumarle 1 mes a la fecha de pago de este cliente — lo mismo
+  // que el botón "Sumar 1 mes a la fecha seleccionada" del menú "Pagos" de
+  // la planilla, pero desde acá. Sirve para cualquier cliente, no solo los
+  // que ya están vencidos — si alguno quiere pagar adelantado, también se
+  // puede usar.
+  const btnPago = document.createElement('button');
+  btnPago.textContent = '💰 Sumar 1 mes';
+  btnPago.style.color = '#1E7A4C';
+  btnPago.onclick = async ()=>{
+    if(!confirm('¿Sumarle 1 mes a la fecha de pago de "' + c.nombre + '"?\n\nPago actual: ' + (c.pagoFecha || 'nunca se cargó'))) return;
+    const textoOriginal = btnPago.textContent;
+    btnPago.textContent = 'Guardando...';
+    btnPago.disabled = true;
+    try{
+      const resultado = await backendPost({ action:'sumarUnMesPago', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '' });
+      if(resultado && resultado.error){
+        setStatus('No se pudo actualizar el pago de ' + c.nombre + ': ' + resultado.error, 'err');
+      } else {
+        c.pagoFecha = resultado.nuevaFecha;
+        pagoLine.textContent = '💵 Pago: ' + c.pagoFecha;
+        setStatus('Pago de ' + c.nombre + ': pasó del ' + resultado.fechaAnterior + ' al ' + resultado.nuevaFecha + '.', 'ok');
+      }
+    }catch(err){
+      setStatus('No se pudo actualizar el pago de ' + c.nombre + ': ' + err.message, 'err');
+    }
+    btnPago.textContent = textoOriginal;
+    btnPago.disabled = false;
+  };
+  acciones.appendChild(btnPago);
 
   // Botón para ver/editar/borrar el texto de la observación a mano, sin
   // depender de los flujos de "Retirar"/"Suspendido" — útil sobre todo para
@@ -1040,6 +1085,84 @@ function renderClientList(){
     section.appendChild(body);
     wrap.appendChild(section);
   });
+
+  // Sección aparte, al final, para "Obradores" — es un caso distinto (no
+  // forma parte del circuito de limpiezas de baños), separado bien del
+  // resto para no mezclarlo, pero con el mismo botón de "Sumar 1 mes".
+  const obradoresFiltrados = obradores.filter(o => !filtro || o.nombre.toLowerCase().includes(filtro));
+  if(obradoresFiltrados.length > 0){
+    const sectionObr = document.createElement('div');
+    sectionObr.style.cssText = 'border:1px solid #C9C2B8; border-radius:8px; margin-top:14px; overflow:hidden;';
+
+    const headerObr = document.createElement('button');
+    headerObr.type = 'button';
+    headerObr.style.cssText = 'width:100%; text-align:left; background:#5B5347; color:#fff; padding:11px 14px; font-family:var(--disp); font-weight:700; font-size:14px; border:none; display:flex; justify-content:space-between; align-items:center; cursor:pointer;';
+    const labelObr = document.createElement('span');
+    labelObr.textContent = '🏗️ Obradores' + ` (${obradoresFiltrados.length})`;
+    const arrowObr = document.createElement('span');
+    arrowObr.textContent = filtro ? '▴' : '▾';
+    headerObr.appendChild(labelObr);
+    headerObr.appendChild(arrowObr);
+
+    const bodyObr = document.createElement('div');
+    bodyObr.style.cssText = 'background:#fff; padding:8px; display:' + (filtro ? 'block' : 'none') + ';';
+
+    obradoresFiltrados.forEach(o=>{
+      const div = document.createElement('div');
+      div.className = 'client-chip';
+
+      const nombreLine = document.createElement('div');
+      nombreLine.innerHTML = o.direccion
+        ? `${escapeHtml(o.nombre)} <span style="color:#8A9793;">— ${escapeHtml(o.direccion)}</span>`
+        : escapeHtml(o.nombre);
+      div.appendChild(nombreLine);
+
+      const pagoLine = document.createElement('div');
+      pagoLine.style.cssText = 'font-size:12px; color:#8A9793; margin-top:2px;';
+      pagoLine.textContent = o.pagoFecha ? ('💵 Pago: ' + o.pagoFecha) : '💵 Pago: nunca se cargó';
+      div.appendChild(pagoLine);
+
+      const acciones = document.createElement('div');
+      acciones.className = 'client-chip-acciones';
+
+      const btnPago = document.createElement('button');
+      btnPago.textContent = '💰 Sumar 1 mes';
+      btnPago.style.color = '#1E7A4C';
+      btnPago.onclick = async ()=>{
+        if(!confirm('¿Sumarle 1 mes a la fecha de pago de "' + o.nombre + '"?\n\nPago actual: ' + (o.pagoFecha || 'nunca se cargó'))) return;
+        const textoOriginal = btnPago.textContent;
+        btnPago.textContent = 'Guardando...';
+        btnPago.disabled = true;
+        try{
+          const resultado = await backendPost({ action:'sumarUnMesPago', hoja:'Obradores', nombre: o.nombre, direccion: o.direccion || '' });
+          if(resultado && resultado.error){
+            setStatus('No se pudo actualizar el pago de ' + o.nombre + ': ' + resultado.error, 'err');
+          } else {
+            o.pagoFecha = resultado.nuevaFecha;
+            pagoLine.textContent = '💵 Pago: ' + o.pagoFecha;
+            setStatus('Pago de ' + o.nombre + ': pasó del ' + resultado.fechaAnterior + ' al ' + resultado.nuevaFecha + '.', 'ok');
+          }
+        }catch(err){
+          setStatus('No se pudo actualizar el pago de ' + o.nombre + ': ' + err.message, 'err');
+        }
+        btnPago.textContent = textoOriginal;
+        btnPago.disabled = false;
+      };
+      acciones.appendChild(btnPago);
+      div.appendChild(acciones);
+      bodyObr.appendChild(div);
+    });
+
+    headerObr.onclick = ()=>{
+      const isOpen = bodyObr.style.display === 'block';
+      bodyObr.style.display = isOpen ? 'none' : 'block';
+      arrowObr.textContent = isOpen ? '▾' : '▴';
+    };
+
+    sectionObr.appendChild(headerObr);
+    sectionObr.appendChild(bodyObr);
+    wrap.appendChild(sectionObr);
+  }
 }
 
 if(document.getElementById('clientListSearchInput')){

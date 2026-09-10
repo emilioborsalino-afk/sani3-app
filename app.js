@@ -184,7 +184,19 @@ function showFatalError(msg){
   banner.textContent = 'Error: ' + msg;
   banner.style.display = 'block';
 }
-window.addEventListener('error', (e)=>{ showFatalError(e.message); });
+window.addEventListener('error', (e)=>{
+  if(e.message === 'Script error.'){
+    // Este es el mensaje genérico que da el navegador cuando algo falla en
+    // la conexión con Google (que es de otro sitio web) — nunca trae
+    // ningún detalle real, así que mostrarlo tal cual solo asusta sin
+    // ayudar. En vez de eso, probamos reconectar solos; "loadAll" ya sabe
+    // manejar sus propios errores de conexión con un aviso más claro, así
+    // que si vuelve a fallar, el aviso que se va a ver es ese, no este.
+    setTimeout(()=>{ loadAll(); }, 1500);
+    return;
+  }
+  showFatalError(e.message);
+});
 window.addEventListener('unhandledrejection', (e)=>{
   showFatalError(e.reason && e.reason.message ? e.reason.message : String(e.reason));
 });
@@ -259,21 +271,33 @@ async function backendGet(action){
 }
 async function backendPost(payload){
   if(!backendUrl) throw new Error('Todavía no conectaste el backend (pegá la URL arriba).');
-  const res = await fetch(backendUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
-    body: JSON.stringify(payload),
-    cache: 'no-store'
-  });
-  const texto = await res.text();
-  let data;
-  try{
-    data = JSON.parse(texto);
-  }catch(errParse){
-    throw new Error('Google no devolvió una respuesta válida (suele ser un bache pasajero).');
+  async function intentar(){
+    const res = await fetch(backendUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
+      body: JSON.stringify(payload),
+      cache: 'no-store'
+    });
+    const texto = await res.text();
+    let data;
+    try{
+      data = JSON.parse(texto);
+    }catch(errParse){
+      throw new Error('Google no devolvió una respuesta válida (suele ser un bache pasajero).');
+    }
+    if(data && data.error) throw new Error(data.error);
+    return data;
   }
-  if(data && data.error) throw new Error(data.error);
-  return data;
+  try{
+    return await intentar();
+  }catch(err){
+    // Reintentamos una vez más antes de mostrar el error — la mayoría de las
+    // veces es un bache de un instante nada más (típico de Google Apps
+    // Script), y con este segundo intento el cartelito ni siquiera llega a
+    // aparecer.
+    await new Promise(r => setTimeout(r, 1200));
+    return await intentar();
+  }
 }
 
 async function loadAll(){

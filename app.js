@@ -304,7 +304,18 @@ async function backendPost(payload){
   return data;
 }
 
+let cargandoEnCurso = false; // evita que dos "loadAll" se pisen entre sí (por ejemplo el reintento de cada 8s y el de "Script error." disparándose casi juntos)
 async function loadAll(){
+  if(cargandoEnCurso) return; // ya hay una carga en curso, no arrancamos otra encima
+  cargandoEnCurso = true;
+  try{
+    await loadAllInterno();
+  } finally {
+    cargandoEnCurso = false;
+  }
+}
+
+async function loadAllInterno(){
   // Guardamos dónde estabas parado con el scroll justo antes de redibujar
   // (no antes de esperar la conexión) — así conectar o reconectar en el
   // fondo no te mueve la pantalla de lugar, incluso si te movés vos

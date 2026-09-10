@@ -178,6 +178,14 @@ function setConnStatus(msg, type){
 function setConnDot(ok){
   document.getElementById('connDot').className = 'conn-dot' + (ok ? ' ok' : '');
   document.getElementById('connLabel').textContent = ok ? 'Conectado al backend' : 'Sin conectar al backend';
+  // Mismo estado, pero en el cartelito chiquito fijo arriba de la pantalla,
+  // que se ve siempre sin importar hasta dónde hayas scrolleado.
+  const dotFijo = document.getElementById('connDotFijo');
+  const labelFijo = document.getElementById('connLabelFijo');
+  if(dotFijo && labelFijo){
+    dotFijo.className = 'conn-dot' + (ok ? ' ok' : '');
+    labelFijo.textContent = ok ? 'Conectado' : 'Sin conectar';
+  }
 }
 
 function showFatalError(msg){
@@ -297,12 +305,12 @@ async function backendPost(payload){
 }
 
 async function loadAll(){
-  // Guardamos dónde estabas parado con el scroll, para volver ahí después
-  // de redibujar todo — así conectar o reconectar en el fondo no te mueve
-  // la pantalla de lugar.
-  const scrollGuardado = window.scrollY;
-  function restaurarScroll(){
-    requestAnimationFrame(()=> window.scrollTo(0, scrollGuardado));
+  // Guardamos dónde estabas parado con el scroll justo antes de redibujar
+  // (no antes de esperar la conexión) — así conectar o reconectar en el
+  // fondo no te mueve la pantalla de lugar, incluso si te movés vos
+  // mientras tanto.
+  function restaurarScrollA(valor){
+    requestAnimationFrame(()=> window.scrollTo(0, valor));
   }
 
   document.getElementById('companyName').value = config.companyName || '';
@@ -312,11 +320,12 @@ async function loadAll(){
   // responde rápido o lento hoy.
   const fechaCache = cargarCacheLocal();
   fusionarPendientesEnRecords();
+  const scrollAntes1 = window.scrollY;
   renderClientSelect();
   renderClientList();
   renderHistory();
   renderPendientesBadge();
-  restaurarScroll();
+  restaurarScrollA(scrollAntes1);
 
   if(!backendUrl){
     setConnDot(false);
@@ -385,11 +394,12 @@ async function loadAll(){
     if(reconexionTimer) clearTimeout(reconexionTimer);
     reconexionTimer = setTimeout(loadAll, 8000);
   }
+  const scrollAntes2 = window.scrollY;
   renderClientSelect();
   renderClientList();
   renderHistory();
   renderPendientesBadge();
-  restaurarScroll();
+  restaurarScrollA(scrollAntes2);
 }
 
 document.getElementById('companyName').addEventListener('change', async (e)=>{

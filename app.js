@@ -5,6 +5,7 @@ if(window.MODO_EMPLEADO){
 const BACKEND_URL_KEY = 'sani3_backend_url';
 
 let backendUrl = '';
+let reconexionTimer = null; // si falla la conexión, guarda el temporizador que sigue reintentando solo, en el fondo
 let clients = [];
 let records = [];
 let pendientesSemana = []; // lista de "Pendientes de esta semana" (viene de la planilla, se muestra como grupo extra)
@@ -296,6 +297,14 @@ async function backendPost(payload){
 }
 
 async function loadAll(){
+  // Guardamos dónde estabas parado con el scroll, para volver ahí después
+  // de redibujar todo — así conectar o reconectar en el fondo no te mueve
+  // la pantalla de lugar.
+  const scrollGuardado = window.scrollY;
+  function restaurarScroll(){
+    requestAnimationFrame(()=> window.scrollTo(0, scrollGuardado));
+  }
+
   document.getElementById('companyName').value = config.companyName || '';
 
   // Primero mostramos YA MISMO lo que haya guardado en el celular (si hay),
@@ -307,6 +316,7 @@ async function loadAll(){
   renderClientList();
   renderHistory();
   renderPendientesBadge();
+  restaurarScroll();
 
   if(!backendUrl){
     setConnDot(false);
@@ -321,14 +331,37 @@ async function loadAll(){
   // Recién ahora, en segundo plano, intentamos la conexión de verdad — sin
   // que esto bloquee ni retrase lo que ya se mostró arriba.
   try{
-    config = await backendGet('config');
-    document.getElementById('companyName').value = config.companyName || '';
+    // Pedimos todo junto, en paralelo (no uno atrás del otro) — así el
+    // tiempo total que tarda en conectar es el del pedido más lento, no la
+    // suma de todos. "Obradores" y "Empresas con deuda" solo hacen falta en
+    // la app del dueño, así que en la de empleados ni se piden — es tiempo
+    // de conexión que se ahorra.
+    const pedidosPrincipales = [
+      backendGet('config'),
+      backendGet('clients'),
+      backendGet('records')
+    ];
+    const pedidosOpcionales = [
+      backendGet('pendientesSemana').catch(()=>[]), // si falla, seguimos sin el listado extra, no es crítico
+    ];
+    if(!window.MODO_EMPLEADO){
+      pedidosOpcionales.push(backendGet('obradores').catch(()=>[]));
+      pedidosOpcionales.push(backendGet('empresasConDeuda').catch(()=>[]));
+    }
 
-    clients = await backendGet('clients');
-    records = await backendGet('records');
-    try{ pendientesSemana = await backendGet('pendientesSemana'); }catch(errPend){ /* si falla, seguimos sin el listado extra, no es crítico */ }
-    try{ obradores = await backendGet('obradores'); }catch(errObr){ /* si falla, no es crítico, la sección de Obradores queda vacía */ }
-    try{ empresasConDeuda = await backendGet('empresasConDeuda'); }catch(errDeuda){ /* si falla, no es crítico */ }
+    const [configResult, clientsResult, recordsResult] = await Promise.all(pedidosPrincipales);
+    const opcionalesResult = await Promise.all(pedidosOpcionales);
+
+    config = configResult;
+    clients = clientsResult;
+    records = recordsResult;
+    document.getElementById('companyName').value = config.companyName || '';
+    pendientesSemana = opcionalesResult[0] || [];
+    if(!window.MODO_EMPLEADO){
+      obradores = opcionalesResult[1] || [];
+      empresasConDeuda = opcionalesResult[2] || [];
+    }
+
     guardarCacheLocal();
     fusionarPendientesEnRecords();
 
@@ -336,20 +369,27 @@ async function loadAll(){
     setConnStatus('Conectado. ' + clients.length + ' clientes, ' + records.length + ' servicios en el historial.', 'ok');
 
     reintentarPendientes();
+    if(reconexionTimer){ clearTimeout(reconexionTimer); reconexionTimer = null; } // ya conectó, no hace falta seguir insistiendo
   }catch(err){
     setConnDot(false);
     const fechaCacheFalla = cargarCacheLocal();
     fusionarPendientesEnRecords();
     if(fechaCacheFalla){
-      setConnStatus('Sin conexión — trabajando con la copia guardada de las ' + fechaCacheFalla + '. Podés seguir sacando fotos, se suben solas cuando vuelva la conexión.', 'err');
+      setConnStatus('Sin conexión — trabajando con la copia guardada de las ' + fechaCacheFalla + '. Podés seguir sacando fotos, se suben solas cuando vuelva la conexión. Reintentando conectar solo en el fondo...', 'err');
     } else {
-      setConnStatus('Error al conectar: ' + err.message, 'err');
+      setConnStatus('Error al conectar: ' + err.message + ' — reintentando solo en el fondo...', 'err');
     }
+    // Como esto es solo LEER datos (nunca cambia nada), es seguro reintentar
+    // todas las veces que haga falta sin arriesgar duplicar nada — a
+    // diferencia de guardar (fotos, pagos), que nunca se reintenta solo.
+    if(reconexionTimer) clearTimeout(reconexionTimer);
+    reconexionTimer = setTimeout(loadAll, 8000);
   }
   renderClientSelect();
   renderClientList();
   renderHistory();
   renderPendientesBadge();
+  restaurarScroll();
 }
 
 document.getElementById('companyName').addEventListener('change', async (e)=>{
@@ -506,6 +546,7 @@ function registroHechoEsteDia(c, diaCanon){
 let selectedClientIndex = null;
 let selectedDiaCanon = null; // desde qué día (Lunes/Martes/etc.) se tocó el cliente al elegirlo
 let diaAccordionAbierto = null; // recuerda qué día quedó desplegado, para no cerrarlo solo al reconectar en segundo plano
+let seccionesListaAbiertas = new Set(); // lo mismo, pero para "Ver lista completa de clientes" (acá sí pueden quedar varias abiertas a la vez)
 
 function updateSelectedLabel(){
   const label = document.getElementById('selectedClientLabel');
@@ -1216,7 +1257,9 @@ function renderClientList(){
 
     const body = document.createElement('div');
     body.className = 'acc-body-list';
-    body.style.cssText = 'background:#fff; padding:8px; display:' + (filtro ? 'block' : 'none') + ';';
+    const abiertoDeAntesLista = !filtro && seccionesListaAbiertas.has(d);
+    body.style.cssText = 'background:#fff; padding:8px; display:' + ((filtro || abiertoDeAntesLista) ? 'block' : 'none') + ';';
+    if(abiertoDeAntesLista) arrow.textContent = '▴';
 
     grupos[d].forEach(i=>{
       const mostrarPago = !pagoYaMostrado.has(i);
@@ -1228,6 +1271,7 @@ function renderClientList(){
       const isOpen = body.style.display === 'block';
       body.style.display = isOpen ? 'none' : 'block';
       arrow.textContent = isOpen ? '▾' : '▴';
+      if(isOpen) seccionesListaAbiertas.delete(d); else seccionesListaAbiertas.add(d);
     };
 
     section.appendChild(header);
@@ -1283,7 +1327,9 @@ function renderSeccionPago(wrap, titulo, lista, hojaDestino, colorBorde, colorHe
   header.appendChild(arrow);
 
   const body = document.createElement('div');
-  body.style.cssText = 'background:#fff; padding:8px; display:' + (filtro ? 'block' : 'none') + ';';
+  const abiertoDeAntesPago = !filtro && seccionesListaAbiertas.has(titulo);
+  body.style.cssText = 'background:#fff; padding:8px; display:' + ((filtro || abiertoDeAntesPago) ? 'block' : 'none') + ';';
+  if(abiertoDeAntesPago) arrow.textContent = '▴';
 
   lista.forEach(o=>{
     body.appendChild(crearFilaPagoGenerica(o, hojaDestino));
@@ -1293,6 +1339,7 @@ function renderSeccionPago(wrap, titulo, lista, hojaDestino, colorBorde, colorHe
     const isOpen = body.style.display === 'block';
     body.style.display = isOpen ? 'none' : 'block';
     arrow.textContent = isOpen ? '▾' : '▴';
+    if(isOpen) seccionesListaAbiertas.delete(titulo); else seccionesListaAbiertas.add(titulo);
   };
 
   section.appendChild(header);

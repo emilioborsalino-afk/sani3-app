@@ -271,33 +271,28 @@ async function backendGet(action){
 }
 async function backendPost(payload){
   if(!backendUrl) throw new Error('Todavía no conectaste el backend (pegá la URL arriba).');
-  async function intentar(){
-    const res = await fetch(backendUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
-      body: JSON.stringify(payload),
-      cache: 'no-store'
-    });
-    const texto = await res.text();
-    let data;
-    try{
-      data = JSON.parse(texto);
-    }catch(errParse){
-      throw new Error('Google no devolvió una respuesta válida (suele ser un bache pasajero).');
-    }
-    if(data && data.error) throw new Error(data.error);
-    return data;
-  }
+  // OJO: acá NO reintentamos solos si algo falla — a diferencia de leer datos,
+  // guardar/cambiar algo (sumar un pago, un monto, una observación, una foto)
+  // no es seguro de repetir a ciegas: si el pedido en realidad SÍ llegó a
+  // guardarse bien en Google pero la respuesta se cortó en el camino, un
+  // reintento automático lo aplicaría dos veces sin que nadie se dé cuenta
+  // (esto pasó de verdad con "Sumar 1 mes" — se llegó a sumar de más). Si
+  // falla, se avisa el error y la persona decide si lo intenta de nuevo.
+  const res = await fetch(backendUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
+    body: JSON.stringify(payload),
+    cache: 'no-store'
+  });
+  const texto = await res.text();
+  let data;
   try{
-    return await intentar();
-  }catch(err){
-    // Reintentamos una vez más antes de mostrar el error — la mayoría de las
-    // veces es un bache de un instante nada más (típico de Google Apps
-    // Script), y con este segundo intento el cartelito ni siquiera llega a
-    // aparecer.
-    await new Promise(r => setTimeout(r, 1200));
-    return await intentar();
+    data = JSON.parse(texto);
+  }catch(errParse){
+    throw new Error('Google no devolvió una respuesta válida (probá de nuevo en un momento).');
   }
+  if(data && data.error) throw new Error(data.error);
+  return data;
 }
 
 async function loadAll(){

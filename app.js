@@ -1376,6 +1376,7 @@ if(document.getElementById('usarMiUbicacionNuevoClienteBtn')){
 
 if(document.getElementById('addClientBtn')){
   document.getElementById('addClientBtn').onclick = async ()=>{
+    const btn = document.getElementById('addClientBtn');
     const input = document.getElementById('newClientInput');
     const addrInput = document.getElementById('newClientAddrInput');
     const fechaInicioInput = document.getElementById('fechaInicioNuevoClienteInput');
@@ -1392,6 +1393,15 @@ if(document.getElementById('addClientBtn')){
       setStatus('Escribí un nombre antes de tocar Agregar (esto es solo para clientes nuevos, los que ya existen se eligen arriba en el desplegable).', 'err');
       return;
     }
+    // Confirmación antes de agregar — así se ve bien claro a quién se va a
+    // agregar, y si tocás el botón sin querer una segunda vez mientras ya
+    // se está guardando, no llega a duplicarlo (el botón queda bloqueado
+    // mientras tanto).
+    if(!confirm('¿Agregar a "' + name + '"' + (addr ? (' — ' + addr) : '') + ' como cliente nuevo?')) return;
+    if(btn.disabled) return; // por si ya se está guardando, no dejamos tocarlo de nuevo
+    const textoOriginal = btn.textContent;
+    btn.textContent = 'Agregando...';
+    btn.disabled = true;
     try{
       await backendPost({ action:'addClient', nombre: name, direccion: addr, ubicacionFija: nuevaUbicacionFija, fechaInicio, cantidad, motivo, colorElegido });
       clients.push({ nombre: name, direccion: addr, dia:'', telefono:'', fechaInicio: fechaInicio || '', ubicacionFija: nuevaUbicacionFija, cantidad: cantidad || '', motivo: motivo || '', colorReserva: colorElegido || '' });
@@ -1405,10 +1415,12 @@ if(document.getElementById('addClientBtn')){
       document.getElementById('usarMiUbicacionNuevoClienteBtn').textContent = '📍 Usar mi ubicación actual';
       renderClientSelect();
       renderClientList();
-      setStatus('Cliente agregado: ' + name, 'ok');
+      setStatus('✅ Cliente agregado: ' + name + (addr ? (' — ' + addr) : ''), 'ok');
     }catch(err){
       setStatus('No se pudo agregar: ' + err.message, 'err');
     }
+    btn.textContent = textoOriginal;
+    btn.disabled = false;
   };
 }
 

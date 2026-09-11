@@ -1479,8 +1479,10 @@ if(document.getElementById('addClientBtn')){
       renderClientSelect();
       renderClientList();
       setStatus('✅ Cliente agregado: ' + name + (addr ? (' — ' + addr) : ''), 'ok');
+      alert('✅ Listo — se agregó a "' + name + '"' + (addr ? (' — ' + addr) : '') + '.');
     }catch(err){
       setStatus('No se pudo agregar: ' + err.message, 'err');
+      alert('❌ No se pudo agregar a "' + name + '":\n\n' + err.message);
     }
     btn.textContent = textoOriginal;
     btn.disabled = false;

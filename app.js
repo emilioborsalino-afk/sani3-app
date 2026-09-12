@@ -1387,6 +1387,138 @@ if(document.getElementById('toggleClientListBtn')){
   };
 }
 
+if(document.getElementById('toggleGastosBtn')){
+  document.getElementById('toggleGastosBtn').onclick = async ()=>{
+    const wrap = document.getElementById('gastosWrap');
+    const btn = document.getElementById('toggleGastosBtn');
+    const visible = wrap.style.display !== 'none';
+    if(visible){
+      wrap.style.display = 'none';
+      btn.textContent = '💸 Gastos';
+      return;
+    }
+    wrap.style.display = 'block';
+    btn.textContent = 'Ocultar gastos';
+    await renderGastosRecientes();
+  };
+}
+
+async function renderGastosRecientes(){
+  const cont = document.getElementById('gastosRecientesList');
+  if(!cont) return;
+  cont.innerHTML = '<div style="padding:8px; color:#8A9793; font-size:13px;">Buscando...</div>';
+  let gastos;
+  try{
+    gastos = await backendGet('gastosRecientes');
+  }catch(err){
+    cont.innerHTML = '<div style="padding:8px; color:#B4432B; font-size:13px;">No se pudo traer la lista: ' + escapeHtml(err.message) + '</div>';
+    return;
+  }
+  if(!gastos || gastos.length === 0){
+    cont.innerHTML = '<div style="padding:8px; color:#8A9793; font-size:13px;">Todavía no hay gastos cargados.</div>';
+    return;
+  }
+  cont.innerHTML = '';
+  gastos.forEach(g=>{
+    const item = document.createElement('div');
+    item.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 4px; border-bottom:1px solid var(--line);';
+
+    const info = document.createElement('div');
+    info.style.cssText = 'flex:1; font-size:13px;';
+    info.innerHTML = `<div style="font-weight:600;">${escapeHtml(g.descripcion)}</div>` +
+      `<div style="color:#8A9793; font-size:11.5px;">${escapeHtml(g.fecha)}${g.pago ? (' — ' + escapeHtml(g.pago)) : ''}</div>`;
+    item.appendChild(info);
+
+    const monto = document.createElement('span');
+    monto.style.cssText = 'font-weight:700; font-size:13px; white-space:nowrap;';
+    monto.textContent = g.monto || '';
+    item.appendChild(monto);
+
+    const btnBorrar = document.createElement('button');
+    btnBorrar.textContent = '🗑️';
+    btnBorrar.style.color = '#B4432B';
+    btnBorrar.onclick = async ()=>{
+      if(!confirm('¿Borrar el gasto "' + g.descripcion + '" (' + (g.monto||'') + ')?\n\nEsto no se puede deshacer.')) return;
+      btnBorrar.disabled = true;
+      try{
+        const resultado = await backendPost({ action:'borrarGasto', fila: g.fila, descripcion: g.descripcion, monto: (g.monto||'').replace('$','').trim() });
+        if(resultado && resultado.error){
+          setStatus('No se pudo borrar: ' + resultado.error, 'err');
+          btnBorrar.disabled = false;
+        } else {
+          setStatus('Gasto borrado: ' + g.descripcion, 'ok');
+          item.remove();
+        }
+      }catch(err){
+        setStatus('No se pudo borrar: ' + err.message, 'err');
+        btnBorrar.disabled = false;
+      }
+    };
+    item.appendChild(btnBorrar);
+
+    cont.appendChild(item);
+  });
+}
+
+if(document.getElementById('agregarGastoBtn')){
+  document.getElementById('agregarGastoBtn').onclick = async ()=>{
+    const btn = document.getElementById('agregarGastoBtn');
+    const descInput = document.getElementById('gastoDescInput');
+    const montoInput = document.getElementById('gastoMontoInput');
+    const pagoInput = document.getElementById('gastoPagoInput');
+    const descripcion = descInput.value.trim();
+    const monto = montoInput.value.trim();
+    if(!descripcion || !monto){
+      setStatus('Completá la descripción y el monto antes de agregar.', 'err');
+      return;
+    }
+    if(!confirm('¿Agregar el gasto "' + descripcion + '" por ' + monto + '?')) return;
+    const textoOriginal = btn.textContent;
+    btn.textContent = 'Agregando...';
+    btn.disabled = true;
+    try{
+      await backendPost({ action:'agregarGastoDirecto', descripcion, monto, pago: pagoInput.value });
+      descInput.value = '';
+      montoInput.value = '';
+      setStatus('✅ Gasto agregado: ' + descripcion, 'ok');
+      await renderGastosRecientes();
+    }catch(err){
+      setStatus('No se pudo agregar el gasto: ' + err.message, 'err');
+    }
+    btn.textContent = textoOriginal;
+    btn.disabled = false;
+  };
+}
+
+if(document.getElementById('agregarGastoYpfBtn')){
+  document.getElementById('agregarGastoYpfBtn').onclick = async ()=>{
+    const btn = document.getElementById('agregarGastoYpfBtn');
+    const descInput = document.getElementById('gastoYpfDescInput');
+    const montoInput = document.getElementById('gastoYpfMontoInput');
+    const descripcion = descInput.value.trim();
+    const monto = montoInput.value.trim();
+    if(!descripcion || !monto){
+      setStatus('Completá la descripción y el monto antes de agregar.', 'err');
+      return;
+    }
+    if(!confirm('¿Agregar el gasto YPF "' + descripcion + '" por ' + monto + '?')) return;
+    const textoOriginal = btn.textContent;
+    btn.textContent = 'Agregando...';
+    btn.disabled = true;
+    try{
+      await backendPost({ action:'agregarGastoYPF', descripcion, monto });
+      descInput.value = '';
+      montoInput.value = '';
+      setStatus('✅ Gasto YPF agregado: ' + descripcion, 'ok');
+      await renderGastosRecientes();
+    }catch(err){
+      setStatus('No se pudo agregar el gasto: ' + err.message, 'err');
+    }
+    btn.textContent = textoOriginal;
+    btn.disabled = false;
+  };
+}
+
 function abrirMapsEnMiUbicacion(botonEstado){
   if(botonEstado) botonEstado.textContent = 'Ubicando...';
   const restaurar = (texto)=>{ if(botonEstado) botonEstado.textContent = texto; };

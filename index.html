@@ -305,6 +305,30 @@
         <input class="client-input" id="clientListSearchInput" placeholder="🔎 Buscar por nombre..." style="width:100%; box-sizing:border-box; margin-bottom:8px;">
         <div id="clientListResults"></div>
       </div>
+      <button id="toggleGastosBtn" style="width:100%; margin-top:6px; background:none; color:#8A6D3B; font-family:var(--body); font-weight:600; font-size:13px; padding:8px;">💸 Gastos</button>
+      <div id="gastosWrap" style="display:none;">
+        <div style="background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px; margin-top:6px;">
+          <div style="font-weight:700; font-size:13.5px; margin-bottom:8px;">Gasto común</div>
+          <input class="client-input" id="gastoDescInput" placeholder="Descripción (ej: Nafta camioneta)" style="width:100%; box-sizing:border-box; margin-bottom:6px;">
+          <input class="client-input" id="gastoMontoInput" placeholder="Monto" style="width:100%; box-sizing:border-box; margin-bottom:6px;">
+          <select class="client-input" id="gastoPagoInput" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+            <option value="pb">pb — Pago Borsa</option>
+            <option value="pc">pc — Pago Chiro</option>
+            <option value="pdc">pdc — Pago de Caja</option>
+          </select>
+          <button id="agregarGastoBtn" class="btn-main" style="width:100%;">➕ Agregar gasto</button>
+        </div>
+        <div style="background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px; margin-top:10px;">
+          <div style="font-weight:700; font-size:13.5px; margin-bottom:8px;">Gasto vía Cheque YPF (sin pago)</div>
+          <input class="client-input" id="gastoYpfDescInput" placeholder="Descripción (ej: Gasoil Toyota)" style="width:100%; box-sizing:border-box; margin-bottom:6px;">
+          <input class="client-input" id="gastoYpfMontoInput" placeholder="Monto" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+          <button id="agregarGastoYpfBtn" class="btn-main" style="width:100%;">➕ Agregar gasto YPF</button>
+        </div>
+        <div style="margin-top:14px;">
+          <div style="font-weight:700; font-size:13px; color:#8A9793; margin-bottom:6px;">Últimos gastos cargados</div>
+          <div id="gastosRecientesList"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -360,7 +384,7 @@
 </div>
 
 <script>window.MODO_EMPLEADO = false;</script>
-<script src="app.js?v=77"></script>
+<script src="app.js?v=78"></script>
 
 </body>
 </html>

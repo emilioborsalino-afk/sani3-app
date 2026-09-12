@@ -1403,13 +1403,29 @@ if(document.getElementById('toggleGastosBtn')){
   };
 }
 
-async function renderGastosRecientes(){
-  const cont = document.getElementById('gastosRecientesList');
+if(document.getElementById('toggleGastosYpfBtn')){
+  document.getElementById('toggleGastosYpfBtn').onclick = async ()=>{
+    const wrap = document.getElementById('gastosYpfWrap');
+    const btn = document.getElementById('toggleGastosYpfBtn');
+    const visible = wrap.style.display !== 'none';
+    if(visible){
+      wrap.style.display = 'none';
+      btn.textContent = '⛽ Gastos YPF';
+      return;
+    }
+    wrap.style.display = 'block';
+    btn.textContent = 'Ocultar gastos YPF';
+    await renderGastosYpfRecientes();
+  };
+}
+
+async function renderListaGastos(accionFetch, contenedorId, accionBorrar){
+  const cont = document.getElementById(contenedorId);
   if(!cont) return;
   cont.innerHTML = '<div style="padding:8px; color:#8A9793; font-size:13px;">Buscando...</div>';
   let gastos;
   try{
-    gastos = await backendGet('gastosRecientes');
+    gastos = await backendGet(accionFetch);
   }catch(err){
     cont.innerHTML = '<div style="padding:8px; color:#B4432B; font-size:13px;">No se pudo traer la lista: ' + escapeHtml(err.message) + '</div>';
     return;
@@ -1441,7 +1457,10 @@ async function renderGastosRecientes(){
       if(!confirm('¿Borrar el gasto "' + g.descripcion + '" (' + (g.monto||'') + ')?\n\nEsto no se puede deshacer.')) return;
       btnBorrar.disabled = true;
       try{
-        const resultado = await backendPost({ action:'borrarGasto', fila: g.fila, descripcion: g.descripcion, monto: (g.monto||'').replace('$','').trim() });
+        // Mandamos el monto en limpio (sin el símbolo $) — el backend ahora
+        // compara por el número real, así que no hace falta que coincida
+        // el formato exacto del texto.
+        const resultado = await backendPost({ action:accionBorrar, fila: g.fila, descripcion: g.descripcion, monto: (g.monto||'').replace('$','').trim() });
         if(resultado && resultado.error){
           setStatus('No se pudo borrar: ' + resultado.error, 'err');
           btnBorrar.disabled = false;
@@ -1459,6 +1478,8 @@ async function renderGastosRecientes(){
     cont.appendChild(item);
   });
 }
+async function renderGastosRecientes(){ return renderListaGastos('gastosRecientes', 'gastosRecientesList', 'borrarGasto'); }
+async function renderGastosYpfRecientes(){ return renderListaGastos('gastosYPFRecientes', 'gastosYpfRecientesList', 'borrarGastoYPF'); }
 
 if(document.getElementById('agregarGastoBtn')){
   document.getElementById('agregarGastoBtn').onclick = async ()=>{
@@ -1510,7 +1531,7 @@ if(document.getElementById('agregarGastoYpfBtn')){
       descInput.value = '';
       montoInput.value = '';
       setStatus('✅ Gasto YPF agregado: ' + descripcion, 'ok');
-      await renderGastosRecientes();
+      await renderGastosYpfRecientes();
     }catch(err){
       setStatus('No se pudo agregar el gasto: ' + err.message, 'err');
     }

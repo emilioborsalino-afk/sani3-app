@@ -978,6 +978,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
           c.pagoFecha = resultado.nuevaFecha;
           pagoLine.textContent = formatearLineaPago(c);
           setStatus('Pago de ' + c.nombre + ': pasó del ' + resultado.fechaAnterior + ' al ' + resultado.nuevaFecha + '.', 'ok');
+          alert('✅ Listo — el pago de "' + c.nombre + '" pasó del ' + resultado.fechaAnterior + ' al ' + resultado.nuevaFecha + '.');
         }
       }catch(err){
         setStatus('No se pudo actualizar el pago de ' + c.nombre + ': ' + err.message, 'err');
@@ -1037,6 +1038,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
           btnCortar.disabled = false;
         } else {
           setStatus(c.nombre + ' se movió al final de la lista.', 'ok');
+          alert('✅ Listo — "' + c.nombre + '" se cortó y se movió a la hoja "Clientes".');
           await loadAll();
         }
       }catch(err){
@@ -1069,6 +1071,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
           btnADeuda.disabled = false;
         } else {
           setStatus(c.nombre + ' se movió a "Empresas con deuda".', 'ok');
+          alert('✅ Listo — "' + c.nombre + '" se movió a "Empresas con deuda".');
           await loadAll();
         }
       }catch(err){
@@ -1870,6 +1873,7 @@ function crearFilaPagoGenerica(o, hojaDestino){
         o.pagoFecha = resultado.nuevaFecha;
         pagoLine.textContent = formatearLineaPago(o);
         setStatus('Pago de ' + o.nombre + ': pasó del ' + resultado.fechaAnterior + ' al ' + resultado.nuevaFecha + '.', 'ok');
+          alert('✅ Listo — el pago de "' + o.nombre + '" pasó del ' + resultado.fechaAnterior + ' al ' + resultado.nuevaFecha + '.');
       }
     }catch(err){
       setStatus('No se pudo actualizar el pago de ' + o.nombre + ': ' + err.message, 'err');
@@ -1949,6 +1953,7 @@ function crearFilaPagoGenerica(o, hojaDestino){
         btnCortar.disabled = false;
       } else {
         setStatus(o.nombre + ' se movió al final de la planilla.', 'ok');
+        alert('✅ Listo — "' + o.nombre + '" se cortó y se movió a la hoja "Clientes".');
         div.remove();
       }
     }catch(err){
@@ -1981,6 +1986,7 @@ function crearFilaPagoGenerica(o, hojaDestino){
         btnADeuda.disabled = false;
       } else {
         setStatus(o.nombre + ' se movió a la sección de deuda.', 'ok');
+        alert('✅ Listo — "' + o.nombre + '" se movió a la sección de deuda.');
         div.remove();
       }
     }catch(err){

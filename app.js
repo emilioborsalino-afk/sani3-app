@@ -1513,6 +1513,10 @@ if(document.getElementById('agregarGastoBtn')){
       setStatus('Completá la descripción y el monto antes de agregar.', 'err');
       return;
     }
+    if(!pagoInput.value){
+      setStatus('Elegí quién paga (pb / pc / pdc) antes de agregar.', 'err');
+      return;
+    }
     if(!confirm('¿Agregar el gasto "' + descripcion + '" por ' + monto + '?')) return;
     const textoOriginal = btn.textContent;
     btn.textContent = 'Agregando...';
@@ -1521,6 +1525,7 @@ if(document.getElementById('agregarGastoBtn')){
       await backendPost({ action:'agregarGastoDirecto', descripcion, monto, pago: pagoInput.value });
       descInput.value = '';
       montoInput.value = '';
+      pagoInput.value = '';
       setStatus('✅ Gasto agregado: ' + descripcion, 'ok');
       await renderGastosRecientes();
     }catch(err){

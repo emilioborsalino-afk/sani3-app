@@ -262,13 +262,13 @@
   <div class="card">
     <div id="selectedClientLabel" style="font-family:var(--disp); font-weight:700; font-size:15px; color:#8A9793; margin-bottom:10px;">Ningún cliente elegido todavía</div>
 
-    <button type="button" id="toggleElegirClienteBtn" class="solo-dueno" style="width:100%; background:var(--teal); color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px; margin-bottom:8px;">👤 Elegir cliente para sacar foto</button>
+    <button type="button" id="toggleElegirClienteBtn" class="solo-dueno" style="width:100%; margin-top:8px; background:var(--teal); color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px;">👤 Elegir cliente para sacar foto</button>
     <div id="elegirClienteWrap" class="solo-dueno" style="display:none;">
       <input class="client-input" id="accordionSearchInput" placeholder="🔎 Buscar cliente..." style="width:100%; box-sizing:border-box; margin-bottom:8px;">
       <div id="clientAccordion"></div>
     </div>
 
-    <button type="button" id="toggleAgregarClienteBtn" class="solo-dueno" style="width:100%; background:var(--amber); color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px; margin-top:6px; margin-bottom:8px;">➕ Agregar cliente nuevo</button>
+    <button type="button" id="toggleAgregarClienteBtn" class="solo-dueno" style="width:100%; margin-top:8px; background:var(--amber); color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px;">➕ Agregar cliente nuevo</button>
     <div id="agregarClienteWrap" class="solo-dueno" style="display:none;">
     <div class="row" style="margin-top:14px;">
       <input class="client-input" id="newClientInput" placeholder="Nombre (solo si no está en la lista)">
@@ -308,17 +308,18 @@
     <button class="btn-small" id="addClientBtn" style="width:100%; margin-top:10px;">Agregar</button>
     </div>
     <div class="solo-dueno">
-      <button id="toggleClientListBtn" style="width:100%; margin-top:10px; background:#6B4A32; color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px;">Ver lista completa de clientes</button>
+      <button id="toggleClientListBtn" style="width:100%; margin-top:8px; background:#6B4A32; color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px;">Ver lista completa de clientes</button>
       <div id="clientList" style="display:none;">
         <input class="client-input" id="clientListSearchInput" placeholder="🔎 Buscar por nombre..." style="width:100%; box-sizing:border-box; margin-bottom:8px;">
         <div id="clientListResults"></div>
       </div>
-      <button id="toggleGastosBtn" style="width:100%; margin-top:6px; background:var(--green); color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px;">💸 Gastos</button>
+      <button id="toggleGastosBtn" style="width:100%; margin-top:8px; background:var(--green); color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px;">💸 Gastos</button>
       <div id="gastosWrap" style="display:none;">
         <div style="background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px; margin-top:6px;">
           <input class="client-input" id="gastoDescInput" placeholder="Descripción (ej: Nafta camioneta)" style="width:100%; box-sizing:border-box; margin-bottom:6px;">
           <input class="client-input" id="gastoMontoInput" placeholder="Monto" style="width:100%; box-sizing:border-box; margin-bottom:6px;">
           <select class="client-input" id="gastoPagoInput" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+            <option value="" selected>Elegí quién paga...</option>
             <option value="pb">pb — Pago Borsa</option>
             <option value="pc">pc — Pago Chiro</option>
             <option value="pdc">pdc — Pago de Caja</option>
@@ -331,7 +332,7 @@
         </div>
       </div>
 
-      <button id="toggleGastosYpfBtn" style="width:100%; margin-top:6px; background:#2F6FA8; color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px;">⛽ Gastos YPF</button>
+      <button id="toggleGastosYpfBtn" style="width:100%; margin-top:8px; background:#2F6FA8; color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px;">⛽ Gastos YPF</button>
       <div id="gastosYpfWrap" style="display:none;">
         <div style="background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px; margin-top:6px;">
           <input class="client-input" id="gastoYpfDescInput" placeholder="Descripción (ej: Gasoil Toyota)" style="width:100%; box-sizing:border-box; margin-bottom:6px;">
@@ -398,7 +399,7 @@
 </div>
 
 <script>window.MODO_EMPLEADO = false;</script>
-<script src="app.js?v=80"></script>
+<script src="app.js?v=81"></script>
 
 </body>
 </html>

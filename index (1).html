@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Registro de Servicios</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#114B4B">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sani3">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+  :root{
+    --bg: #F3F6F5;
+    --ink: #15211E;
+    --teal: #114B4B;
+    --teal-deep: #0B3535;
+    --green: #2E7D5B;
+    --amber: #C97A22;
+    --card: #FFFFFF;
+    --line: #D8E0DE;
+    --mono: 'IBM Plex Mono', monospace;
+    --disp: 'Barlow Semi Condensed', sans-serif;
+    --body: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--body);
+    -webkit-tap-highlight-color:transparent;
+    min-height:100vh;
+    padding-bottom:40px;
+  }
+  .topbar{
+    background:var(--teal);
+    color:#EFF7F5;
+    padding:18px 20px 22px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.12);
+  }
+  .topbar input{
+    background:transparent;
+    border:none;
+    color:#EFF7F5;
+    font-family:var(--disp);
+    font-weight:800;
+    font-size:22px;
+    letter-spacing:0.3px;
+    width:100%;
+    padding:0;
+  }
+  .topbar input::placeholder{color:#9FC2BC;}
+  .topbar .sub{
+    font-family:var(--mono);
+    font-size:12px;
+    color:#9FC2BC;
+    margin-top:4px;
+    letter-spacing:0.5px;
+  }
+  .conn-dot{
+    display:inline-block; width:8px; height:8px; border-radius:50%;
+    background:#C97A22; margin-right:6px;
+  }
+  .conn-dot.ok{background:#5FBE8B;}
+  main{
+    max-width:520px;
+    margin:0 auto;
+    padding:18px 16px 0;
+  }
+  .section-label{
+    font-family:var(--disp);
+    font-weight:700;
+    font-size:13px;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    color:var(--teal);
+    margin:22px 0 10px 2px;
+  }
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px;
+  }
+  select, .client-input{
+    width:100%;
+    padding:12px 12px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    font-family:var(--body);
+    font-size:16px;
+    background:#fff;
+    color:var(--ink);
+  }
+  .row{display:flex; gap:8px; margin-top:10px;}
+  .row .client-input{flex:1;}
+  button{
+    font-family:var(--disp);
+    font-weight:700;
+    letter-spacing:0.2px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+  }
+  .btn-small{
+    background:var(--teal);
+    color:#fff;
+    padding:0 16px;
+    font-size:15px;
+  }
+  .btn-small:active{background:var(--teal-deep);}
+  .btn-main{
+    width:100%;
+    background:var(--green);
+    color:#fff;
+    font-size:19px;
+    padding:18px 10px;
+    margin-top:14px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    cursor:pointer;
+    user-select:none;
+    border-radius:8px;
+  }
+  .btn-main.disabled-look{background:#B9C4C0; cursor:not-allowed;}
+  .btn-main:active{background:#245F46;}
+  body.modo-empleado .solo-dueno{ display:none !important; }
+  .status-line{
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:#5A6A66;
+    margin-top:10px;
+    min-height:16px;
+    white-space:pre-wrap;
+  }
+  .status-line.ok{color:var(--green);}
+  .status-line.err{color:#B4432B;}
+
+  .client-chip{
+    display:flex; flex-direction:column; gap:8px;
+    background:#fff; border:1px solid var(--line); border-radius:8px;
+    padding:10px 12px; margin-top:8px; font-size:14.5px;
+  }
+  .client-chip-acciones{
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  }
+  .client-chip button{
+    background:none; color:#B4432B; font-family:var(--body); font-weight:600;
+    font-size:13px; padding:3px 2px;
+  }
+
+  .ticket{
+    position:relative;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    margin-top:12px;
+    padding:14px 14px 12px;
+    animation: stamp 0.35s ease-out;
+  }
+  @keyframes stamp{
+    from{ transform:scale(0.96); opacity:0; }
+    to{ transform:scale(1); opacity:1; }
+  }
+  .ticket::before{
+    content:"";
+    position:absolute;
+    left:14px; right:14px; bottom:-1px;
+    border-top:1.5px dashed var(--line);
+  }
+  .ticket-top{
+    display:flex; justify-content:space-between; align-items:flex-start; gap:10px;
+  }
+  .ticket-client{
+    font-family:var(--disp); font-weight:700; font-size:17px; color:var(--teal-deep);
+  }
+  .ticket-code{
+    font-family:var(--mono); font-size:11px; color:#8A9793; text-align:right; white-space:nowrap;
+  }
+  .ticket-time{
+    font-family:var(--mono); font-size:13px; color:#3C4A46; margin-top:4px;
+  }
+  .ticket-body{
+    display:flex; gap:10px; margin-top:10px;
+  }
+  .ticket-photo{
+    width:78px; height:78px; border-radius:6px; object-fit:cover;
+    border:1px solid var(--line); flex-shrink:0; cursor:pointer;
+  }
+  .ticket-info{font-size:13px; color:#4A5854; line-height:1.5; flex:1; min-width:0;}
+  .ticket-info a{color:var(--teal); text-decoration:none; font-weight:600;}
+  .ticket-actions{
+    display:flex; gap:8px; margin-top:12px;
+  }
+  .ticket-actions button{
+    flex:1; padding:10px 6px; font-size:13.5px;
+  }
+  .btn-wa{background:#1F8A5C; color:#fff;}
+  .btn-wa:active{background:#166B47;}
+  .btn-del{background:#fff; color:#B4432B; border:1px solid #EBC9C0;}
+
+  .empty{
+    text-align:center; color:#8A9793; font-size:14px; padding:30px 10px;
+    font-family:var(--mono);
+  }
+
+  .lightbox{
+    position:fixed; inset:0; background:rgba(10,20,18,0.9);
+    display:none; align-items:center; justify-content:center; z-index:50; padding:20px;
+  }
+  .lightbox.open{display:flex;}
+  .lightbox img{max-width:100%; max-height:100%; border-radius:8px;}
+
+  footer.note{
+    max-width:520px; margin:26px auto 0; padding:0 16px 10px;
+    font-size:12px; color:#8A9793; line-height:1.5;
+  }
+
+  #fatalErrorBanner{
+    position:fixed; top:0; left:0; right:0; background:#B4432B; color:#fff;
+    padding:10px 14px; font-family:monospace; font-size:12px; z-index:9999;
+    white-space:pre-wrap; display:none;
+  }
+</style>
+</head>
+<body>
+
+<div id="fatalErrorBanner"></div>
+<div id="noCerrarBanner" style="display:none; position:fixed; top:0; left:0; right:0; z-index:9999; background:#B4432B; color:#fff; text-align:center; padding:10px 14px; font-weight:700; font-size:13.5px;">⏳ No cierres la app todavía — guardando la foto...</div>
+<div id="connBadgeFijo" style="position:fixed; top:8px; right:8px; z-index:9998; background:rgba(20,30,28,0.88); border-radius:14px; padding:5px 10px; font-family:var(--body); font-size:11px; color:#fff; display:flex; align-items:center; gap:5px; box-shadow:0 1px 4px rgba(0,0,0,0.3);">
+  <span class="conn-dot" id="connDotFijo"></span><span id="connLabelFijo">Sin conectar</span>
+</div>
+
+<div class="topbar">
+  <img src="logo.png" alt="Sani3" style="width:100%; max-width:320px; height:auto; display:block; margin:0 auto 10px;">
+  <input id="companyName" placeholder="Nombre de la empresa" style="display:none;" />
+  <div class="sub" id="todayLabel" style="text-align:center;"></div>
+  <div class="sub" style="margin-top:8px; text-align:center;"><span class="conn-dot" id="connDot"></span><span id="connLabel">Sin conectar al backend</span></div>
+  <div id="pendientesBadge" style="display:none; margin-top:8px; text-align:center; font-size:12.5px; font-weight:700; color:#8A6D3B; background:#FBF3E9; border:1px solid #EEDCC0; border-radius:8px; padding:6px 10px;"></div>
+</div>
+
+<main>
+
+  <div class="section-label">Conexión (una sola vez por celular)</div>
+  <div class="card">
+    <input class="client-input" id="backendUrlInput" placeholder="Pegá acá la URL del Apps Script (Web App)">
+    <button class="btn-small" id="saveBackendUrlBtn" style="width:100%; margin-top:10px; padding:12px;">Conectar</button>
+    <button class="btn-small" id="workOfflineBtn" style="width:100%; margin-top:8px; padding:10px; background:none; border:1px solid var(--line); color:var(--teal);">Trabajar sin conexión (usar la última copia guardada)</button>
+    <div class="status-line" id="connStatus"></div>
+  </div>
+
+  <div class="section-label">Cliente</div>
+  <div class="card">
+    <div id="selectedClientLabel" style="font-family:var(--disp); font-weight:700; font-size:15px; color:#8A9793; margin-bottom:10px;">Ningún cliente elegido todavía</div>
+
+    <button type="button" id="toggleElegirClienteBtn" class="solo-dueno" style="width:100%; background:var(--teal); color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px; margin-bottom:8px;">👤 Elegir cliente para sacar foto</button>
+    <div id="elegirClienteWrap" class="solo-dueno" style="display:none;">
+      <input class="client-input" id="accordionSearchInput" placeholder="🔎 Buscar cliente..." style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+      <div id="clientAccordion"></div>
+    </div>
+
+    <button type="button" id="toggleAgregarClienteBtn" class="solo-dueno" style="width:100%; background:var(--amber); color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px; margin-top:6px; margin-bottom:8px;">➕ Agregar cliente nuevo</button>
+    <div id="agregarClienteWrap" class="solo-dueno" style="display:none;">
+    <div class="row" style="margin-top:14px;">
+      <input class="client-input" id="newClientInput" placeholder="Nombre (solo si no está en la lista)">
+    </div>
+    <div class="row">
+      <input class="client-input" id="newClientAddrInput" placeholder="Dirección / ubicación">
+    </div>
+    <div style="font-size:11.5px; color:#8A9793; margin-top:10px; margin-bottom:4px;">Datos opcionales para la planilla (podés dejarlos vacíos y completarlos después ahí):</div>
+    <div class="row" style="align-items:flex-end;">
+      <div style="flex:1.4;">
+        <div style="font-size:11px; color:#8A9793; margin-bottom:3px;">Fecha de inicio</div>
+        <input class="client-input" type="date" id="fechaInicioNuevoClienteInput" style="width:100%; box-sizing:border-box; font-size:12.5px; padding:6px;">
+      </div>
+      <div style="flex:0.7;">
+        <div style="font-size:11px; color:#8A9793; margin-bottom:3px;">Cantidad</div>
+        <input class="client-input" type="number" min="1" id="cantNuevoClienteInput" style="width:100%; box-sizing:border-box; font-size:12.5px; padding:6px;">
+      </div>
+    </div>
+    <div class="row">
+      <select class="client-input" id="motivoNuevoClienteInput" style="width:100%;">
+        <option value="">Motivo de contratación (opcional)</option>
+        <option value="Mensual">Mensual</option>
+        <option value="Evento">Evento</option>
+      </select>
+    </div>
+    <div class="row">
+      <select class="client-input" id="colorNuevoClienteInput" style="width:100%;">
+        <option value="">Color al agregarlo: celeste (por defecto)</option>
+        <option value="amarillo">🟡 Amarillo</option>
+        <option value="verde">🟢 Verde</option>
+      </select>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      <button type="button" id="usarMiUbicacionNuevoClienteBtn" style="flex:1; background:var(--green); color:#fff; font-family:var(--body); font-weight:600; font-size:12.5px; padding:7px; border-radius:6px;">📍 Usar mi ubicación actual</button>
+      <button type="button" id="buscarMapsNuevoClienteBtn" style="flex:1; background:var(--teal); color:#fff; font-family:var(--body); font-weight:600; font-size:12.5px; padding:7px; border-radius:6px;">🗺️ Abrir Maps</button>
+    </div>
+    <button class="btn-small" id="addClientBtn" style="width:100%; margin-top:10px;">Agregar</button>
+    </div>
+    <div class="solo-dueno">
+      <button id="toggleClientListBtn" style="width:100%; margin-top:10px; background:#6B4A32; color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px;">Ver lista completa de clientes</button>
+      <div id="clientList" style="display:none;">
+        <input class="client-input" id="clientListSearchInput" placeholder="🔎 Buscar por nombre..." style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+        <div id="clientListResults"></div>
+      </div>
+      <button id="toggleGastosBtn" style="width:100%; margin-top:6px; background:var(--green); color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px;">💸 Gastos</button>
+      <div id="gastosWrap" style="display:none;">
+        <div style="background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px; margin-top:6px;">
+          <input class="client-input" id="gastoDescInput" placeholder="Descripción (ej: Nafta camioneta)" style="width:100%; box-sizing:border-box; margin-bottom:6px;">
+          <input class="client-input" id="gastoMontoInput" placeholder="Monto" style="width:100%; box-sizing:border-box; margin-bottom:6px;">
+          <select class="client-input" id="gastoPagoInput" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+            <option value="pb">pb — Pago Borsa</option>
+            <option value="pc">pc — Pago Chiro</option>
+            <option value="pdc">pdc — Pago de Caja</option>
+          </select>
+          <button id="agregarGastoBtn" class="btn-main" style="width:100%;">➕ Agregar gasto</button>
+        </div>
+        <div style="margin-top:14px;">
+          <div style="font-weight:700; font-size:13px; color:#8A9793; margin-bottom:6px;">Últimos gastos cargados</div>
+          <div id="gastosRecientesList"></div>
+        </div>
+      </div>
+
+      <button id="toggleGastosYpfBtn" style="width:100%; margin-top:6px; background:#2F6FA8; color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px;">⛽ Gastos YPF</button>
+      <div id="gastosYpfWrap" style="display:none;">
+        <div style="background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px; margin-top:6px;">
+          <input class="client-input" id="gastoYpfDescInput" placeholder="Descripción (ej: Gasoil Toyota)" style="width:100%; box-sizing:border-box; margin-bottom:6px;">
+          <input class="client-input" id="gastoYpfMontoInput" placeholder="Monto" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+          <button id="agregarGastoYpfBtn" class="btn-main" style="width:100%;">➕ Agregar gasto YPF</button>
+        </div>
+        <div style="margin-top:14px;">
+          <div style="font-weight:700; font-size:13px; color:#8A9793; margin-bottom:6px;">Últimos gastos YPF cargados</div>
+          <div id="gastosYpfRecientesList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label">Registrar visita — foto del frente de la obra</div>
+  <div class="card">
+    <div id="ubicacionStatusRow" style="display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:13px;">
+      <span id="ubicacionStatusTexto" style="flex:1; color:#8A9793;">📍 Buscando tu ubicación...</span>
+      <button type="button" id="refrescarUbicacionBtn" style="background:none; color:var(--teal); font-family:var(--body); font-weight:600; font-size:12.5px; padding:5px 10px; border:1px solid var(--line); border-radius:6px;">🔄 Actualizar</button>
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="display:block; font-size:12.5px; font-weight:600; color:var(--teal-deep); margin-bottom:6px;">Resultado de la visita</label>
+      <select id="resultadoSelect" class="client-input" style="width:100%;">
+        <option value="Se limpió y se desagotó" selected>Se limpió y se desagotó</option>
+        <option value="Baño entregado">Baño entregado</option>
+        <option value="Se limpió pero no se pudo desagotar">Se limpió pero no se pudo desagotar</option>
+        <option value="Cerrado">Cerrado</option>
+        <option value="Sin acceso">Sin acceso</option>
+        <option value="Cliente pidió reprogramar">Cliente pidió reprogramar</option>
+      </select>
+    </div>
+    <input type="file" accept="image/*" capture="environment" id="photoInput" style="position:absolute; width:1px; height:1px; opacity:0; overflow:hidden;">
+    <label class="btn-main" id="registerBtn" for="photoInput">📷 Foto del frente de la obra y registrar</label>
+    <div id="selectedClientLabelBottom" style="text-align:center; font-family:var(--disp); font-weight:700; font-size:13.5px; color:#8A9793; margin-top:8px;">Ningún cliente elegido todavía</div>
+    <div class="status-line" id="statusLine"></div>
+  </div>
+
+  <div class="section-label">Historial</div>
+  <div class="card" style="padding:12px;">
+    <button class="btn-small" id="exportBtn" style="width:100%; padding:12px;">⬇ Exportar historial a Excel</button>
+    <button class="btn-small" id="refreshBtn" style="width:100%; padding:12px; margin-top:8px; background:var(--teal-deep);">↻ Actualizar historial</button>
+    <details class="solo-dueno" style="margin-top:10px; font-size:12.5px; color:#8A9793;">
+      <summary style="cursor:pointer; font-weight:600;">✏️ Corregí un nombre o dirección mal escrito (actualiza el historial viejo también)</summary>
+      <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
+        <input class="client-input" id="renombrarViejoInput" placeholder="Nombre tal cual está ahora en el historial" style="font-size:13px;">
+        <input class="client-input" id="renombrarNuevoInput" placeholder="Nombre corregido" style="font-size:13px;">
+        <input class="client-input" id="renombrarDireccionInput" placeholder="Dirección corregida (opcional)" style="font-size:13px;">
+        <button class="btn-small" id="renombrarHistorialBtn" style="width:100%; padding:10px;">Aplicar corrección a todo el historial</button>
+      </div>
+    </details>
+  </div>
+  <div id="historyList"></div>
+
+</main>
+
+<footer class="note">
+  Los datos se guardan en tu Google Sheet: cualquiera que abra esta app apuntando al mismo backend ve el mismo historial y los mismos clientes.
+  Cada foto queda con una franja quemada abajo con cliente, fecha, hora y coordenadas (no se puede editar después) y se sube a una carpeta de Google Drive llamada "Fotos Registro Servicios".
+  El botón de WhatsApp intenta compartir foto + texto directo (en celular); si el navegador no lo permite, abre WhatsApp con el texto y hay que adjuntar la foto a mano.
+</footer>
+
+<div class="lightbox" id="lightbox" onclick="this.classList.remove('open')">
+  <img id="lightboxImg" src="">
+</div>
+
+<script>window.MODO_EMPLEADO = false;</script>
+<script src="app.js?v=80"></script>
+
+</body>
+</html>

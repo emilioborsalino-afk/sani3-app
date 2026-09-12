@@ -287,20 +287,36 @@ async function backendPost(payload){
   // reintento automático lo aplicaría dos veces sin que nadie se dé cuenta
   // (esto pasó de verdad con "Sumar 1 mes" — se llegó a sumar de más). Si
   // falla, se avisa el error y la persona decide si lo intenta de nuevo.
-  const res = await fetch(backendUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
-    body: JSON.stringify(payload),
-    cache: 'no-store'
-  });
-  const texto = await res.text();
+  let res;
+  try{
+    res = await fetch(backendUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
+      body: JSON.stringify(payload),
+      cache: 'no-store'
+    });
+  }catch(errRed){
+    // Acá el pedido ni siquiera salió del celular (sin señal, por ejemplo)
+    // — en este caso sí es seguro asumir que no se guardó nada, porque
+    // nunca llegó a tocar a Google.
+    throw new Error('No se pudo conectar — no llegó a mandarse. No hace falta revisar la planilla, no se guardó nada.');
+  }
+  let texto;
+  try{
+    texto = await res.text();
+  }catch(errTexto){
+    // Acá sí es el caso ambiguo: el pedido salió y puede que Google ya lo
+    // haya procesado y guardado, pero la respuesta se cortó en el camino
+    // de vuelta.
+    throw new Error('Se mandó el pedido pero no llegó la respuesta de vuelta — ANTES DE REINTENTAR, revisá la planilla para ver si ya se guardó (para no aplicarlo dos veces).');
+  }
   let data;
   try{
     data = JSON.parse(texto);
   }catch(errParse){
-    throw new Error('Google no devolvió una respuesta válida (probá de nuevo en un momento).');
+    throw new Error('Google devolvió algo raro, no una respuesta clara — ANTES DE REINTENTAR, revisá la planilla para ver si ya se guardó (para no aplicarlo dos veces).');
   }
-  if(data && data.error) throw new Error(data.error);
+  if(data && data.error) throw new Error(data.error); // esto es un error de verdad que devolvió el backend (por ejemplo "no se encontró el cliente") — ahí sí sabemos que no se guardó
   return data;
 }
 
@@ -957,6 +973,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
         const resultado = await backendPost({ action:'sumarUnMesPago', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '' });
         if(resultado && resultado.error){
           setStatus('No se pudo actualizar el pago de ' + c.nombre + ': ' + resultado.error, 'err');
+          alert('❌ No se pudo actualizar el pago de ' + c.nombre + ':\n\n' + resultado.error);
         } else {
           c.pagoFecha = resultado.nuevaFecha;
           pagoLine.textContent = formatearLineaPago(c);
@@ -964,6 +981,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
         }
       }catch(err){
         setStatus('No se pudo actualizar el pago de ' + c.nombre + ': ' + err.message, 'err');
+      alert('❌ No se pudo actualizar el pago de ' + c.nombre + ':\n\n' + err.message);
       }
       btnPago.textContent = textoOriginal;
       btnPago.disabled = false;
@@ -984,6 +1002,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
         const resultado = await backendPost({ action:'actualizarMontoPago', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', monto: nuevoTexto });
         if(resultado && resultado.error){
           setStatus('No se pudo actualizar el monto de ' + c.nombre + ': ' + resultado.error, 'err');
+          alert('❌ No se pudo actualizar el monto de ' + c.nombre + ':\n\n' + resultado.error);
         } else {
           c.monto = resultado.monto;
           pagoLine.textContent = formatearLineaPago(c);
@@ -991,6 +1010,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
         }
       }catch(err){
         setStatus('No se pudo actualizar el monto de ' + c.nombre + ': ' + err.message, 'err');
+      alert('❌ No se pudo actualizar el monto de ' + c.nombre + ':\n\n' + err.message);
       }
       btnMonto.textContent = textoOriginal;
       btnMonto.disabled = false;
@@ -1012,6 +1032,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
         const resultado = await backendPost({ action:'cortarClienteAlFinal', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '' });
         if(resultado && resultado.error){
           setStatus('No se pudo cortar a ' + c.nombre + ': ' + resultado.error, 'err');
+          alert('❌ No se pudo cortar a ' + c.nombre + ':\n\n' + resultado.error);
           btnCortar.textContent = textoOriginal;
           btnCortar.disabled = false;
         } else {
@@ -1020,6 +1041,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
         }
       }catch(err){
         setStatus('No se pudo cortar a ' + c.nombre + ': ' + err.message, 'err');
+      alert('❌ No se pudo cortar a ' + c.nombre + ':\n\n' + err.message);
         btnCortar.textContent = textoOriginal;
         btnCortar.disabled = false;
       }
@@ -1042,6 +1064,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
         const resultado = await backendPost({ action:'cortarClienteADeuda', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '' });
         if(resultado && resultado.error){
           setStatus('No se pudo mover a ' + c.nombre + ': ' + resultado.error, 'err');
+          alert('❌ No se pudo mover a ' + c.nombre + ':\n\n' + resultado.error);
           btnADeuda.textContent = textoOriginal;
           btnADeuda.disabled = false;
         } else {
@@ -1050,6 +1073,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
         }
       }catch(err){
         setStatus('No se pudo mover a ' + c.nombre + ': ' + err.message, 'err');
+      alert('❌ No se pudo mover a ' + c.nombre + ':\n\n' + err.message);
         btnADeuda.textContent = textoOriginal;
         btnADeuda.disabled = false;
       }
@@ -1088,6 +1112,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
         return;
       }catch(err){
         setStatus('No se pudo guardar la nota: ' + err.message, 'err');
+      alert('❌ No se pudo guardar la nota:\n\n' + err.message);
       }
       btnNota.textContent = textoOriginal;
       btnNota.disabled = false;
@@ -1483,6 +1508,7 @@ async function renderListaGastos(accionFetch, contenedorId, accionBorrar){
         const resultado = await backendPost({ action:accionBorrar, fila: g.fila, descripcion: g.descripcion, monto: (g.monto||'').replace('$','').trim() });
         if(resultado && resultado.error){
           setStatus('No se pudo borrar: ' + resultado.error, 'err');
+          alert('❌ No se pudo borrar el gasto:\n\n' + resultado.error);
           btnBorrar.disabled = false;
         } else {
           setStatus('Gasto borrado: ' + g.descripcion, 'ok');
@@ -1490,6 +1516,7 @@ async function renderListaGastos(accionFetch, contenedorId, accionBorrar){
         }
       }catch(err){
         setStatus('No se pudo borrar: ' + err.message, 'err');
+        alert('❌ No se pudo borrar el gasto:\n\n' + err.message);
         btnBorrar.disabled = false;
       }
     };
@@ -1530,6 +1557,7 @@ if(document.getElementById('agregarGastoBtn')){
       await renderGastosRecientes();
     }catch(err){
       setStatus('No se pudo agregar el gasto: ' + err.message, 'err');
+      alert('❌ No se pudo agregar el gasto:\n\n' + err.message);
     }
     btn.textContent = textoOriginal;
     btn.disabled = false;
@@ -1559,6 +1587,7 @@ if(document.getElementById('agregarGastoYpfBtn')){
       await renderGastosYpfRecientes();
     }catch(err){
       setStatus('No se pudo agregar el gasto: ' + err.message, 'err');
+      alert('❌ No se pudo agregar el gasto:\n\n' + err.message);
     }
     btn.textContent = textoOriginal;
     btn.disabled = false;
@@ -1836,6 +1865,7 @@ function crearFilaPagoGenerica(o, hojaDestino){
       const resultado = await backendPost({ action:'sumarUnMesPago', hoja:hojaDestino, nombre: o.nombre, direccion: o.direccion || '' });
       if(resultado && resultado.error){
         setStatus('No se pudo actualizar el pago de ' + o.nombre + ': ' + resultado.error, 'err');
+          alert('❌ No se pudo actualizar el pago de ' + o.nombre + ':\n\n' + resultado.error);
       } else {
         o.pagoFecha = resultado.nuevaFecha;
         pagoLine.textContent = formatearLineaPago(o);
@@ -1843,6 +1873,7 @@ function crearFilaPagoGenerica(o, hojaDestino){
       }
     }catch(err){
       setStatus('No se pudo actualizar el pago de ' + o.nombre + ': ' + err.message, 'err');
+      alert('❌ No se pudo actualizar el pago de ' + o.nombre + ':\n\n' + err.message);
     }
     btnPago.textContent = textoOriginal;
     btnPago.disabled = false;
@@ -1862,6 +1893,7 @@ function crearFilaPagoGenerica(o, hojaDestino){
       const resultado = await backendPost({ action:'actualizarMontoPago', hoja:hojaDestino, nombre: o.nombre, direccion: o.direccion || '', monto: nuevoTexto });
       if(resultado && resultado.error){
         setStatus('No se pudo actualizar el monto de ' + o.nombre + ': ' + resultado.error, 'err');
+          alert('❌ No se pudo actualizar el monto de ' + o.nombre + ':\n\n' + resultado.error);
       } else {
         o.monto = resultado.monto;
         pagoLine.textContent = formatearLineaPago(o);
@@ -1869,6 +1901,7 @@ function crearFilaPagoGenerica(o, hojaDestino){
       }
     }catch(err){
       setStatus('No se pudo actualizar el monto de ' + o.nombre + ': ' + err.message, 'err');
+      alert('❌ No se pudo actualizar el monto de ' + o.nombre + ':\n\n' + err.message);
     }
     btnMonto.textContent = textoOriginal;
     btnMonto.disabled = false;
@@ -1892,6 +1925,7 @@ function crearFilaPagoGenerica(o, hojaDestino){
       return;
     }catch(err){
       setStatus('No se pudo guardar la observación: ' + err.message, 'err');
+      alert('❌ No se pudo guardar la observación:\n\n' + err.message);
     }
     btnObs.textContent = textoOriginal;
     btnObs.disabled = false;
@@ -1910,6 +1944,7 @@ function crearFilaPagoGenerica(o, hojaDestino){
       const resultado = await backendPost({ action:'cortarClienteAlFinal', hoja:hojaDestino, nombre: o.nombre, direccion: o.direccion || '' });
       if(resultado && resultado.error){
         setStatus('No se pudo cortar a ' + o.nombre + ': ' + resultado.error, 'err');
+          alert('❌ No se pudo cortar a ' + o.nombre + ':\n\n' + resultado.error);
         btnCortar.textContent = textoOriginal;
         btnCortar.disabled = false;
       } else {
@@ -1918,6 +1953,7 @@ function crearFilaPagoGenerica(o, hojaDestino){
       }
     }catch(err){
       setStatus('No se pudo cortar a ' + o.nombre + ': ' + err.message, 'err');
+      alert('❌ No se pudo cortar a ' + o.nombre + ':\n\n' + err.message);
       btnCortar.textContent = textoOriginal;
       btnCortar.disabled = false;
     }
@@ -1940,6 +1976,7 @@ function crearFilaPagoGenerica(o, hojaDestino){
       const resultado = await backendPost({ action:'cortarClienteADeuda', hoja:hojaDestino, nombre: o.nombre, direccion: o.direccion || '' });
       if(resultado && resultado.error){
         setStatus('No se pudo mover a ' + o.nombre + ': ' + resultado.error, 'err');
+          alert('❌ No se pudo mover a ' + o.nombre + ':\n\n' + resultado.error);
         btnADeuda.textContent = textoOriginal;
         btnADeuda.disabled = false;
       } else {
@@ -1948,6 +1985,7 @@ function crearFilaPagoGenerica(o, hojaDestino){
       }
     }catch(err){
       setStatus('No se pudo mover a ' + o.nombre + ': ' + err.message, 'err');
+      alert('❌ No se pudo mover a ' + o.nombre + ':\n\n' + err.message);
       btnADeuda.textContent = textoOriginal;
       btnADeuda.disabled = false;
     }
@@ -2537,6 +2575,7 @@ function renderHistory(){
         setStatus('Observación guardada para ' + rec.cliente, 'ok');
       }catch(err){
         setStatus('No se pudo guardar la observación: ' + err.message, 'err');
+      alert('❌ No se pudo guardar la observación:\n\n' + err.message);
         btn.textContent = textoOriginal;
         btn.disabled = false;
       }

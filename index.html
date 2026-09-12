@@ -261,8 +261,15 @@
   <div class="section-label">Cliente</div>
   <div class="card">
     <div id="selectedClientLabel" style="font-family:var(--disp); font-weight:700; font-size:15px; color:#8A9793; margin-bottom:10px;">Ningún cliente elegido todavía</div>
-    <input class="client-input" id="accordionSearchInput" placeholder="🔎 Buscar cliente..." style="width:100%; box-sizing:border-box; margin-bottom:8px;">
-    <div id="clientAccordion"></div>
+
+    <button type="button" id="toggleElegirClienteBtn" class="solo-dueno" style="width:100%; background:var(--teal); color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px; margin-bottom:8px;">👤 Elegir cliente para sacar foto</button>
+    <div id="elegirClienteWrap" class="solo-dueno" style="display:none;">
+      <input class="client-input" id="accordionSearchInput" placeholder="🔎 Buscar cliente..." style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+      <div id="clientAccordion"></div>
+    </div>
+
+    <button type="button" id="toggleAgregarClienteBtn" class="solo-dueno" style="width:100%; background:var(--amber); color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px; margin-top:6px; margin-bottom:8px;">➕ Agregar cliente nuevo</button>
+    <div id="agregarClienteWrap" class="solo-dueno" style="display:none;">
     <div class="row" style="margin-top:14px;">
       <input class="client-input" id="newClientInput" placeholder="Nombre (solo si no está en la lista)">
     </div>
@@ -299,6 +306,7 @@
       <button type="button" id="buscarMapsNuevoClienteBtn" style="flex:1; background:var(--teal); color:#fff; font-family:var(--body); font-weight:600; font-size:12.5px; padding:7px; border-radius:6px;">🗺️ Abrir Maps</button>
     </div>
     <button class="btn-small" id="addClientBtn" style="width:100%; margin-top:10px;">Agregar</button>
+    </div>
     <div class="solo-dueno">
       <button id="toggleClientListBtn" style="width:100%; margin-top:10px; background:none; color:var(--teal); font-family:var(--body); font-weight:600; font-size:13px; padding:8px;">Ver lista completa de clientes</button>
       <div id="clientList" style="display:none;">
@@ -390,7 +398,7 @@
 </div>
 
 <script>window.MODO_EMPLEADO = false;</script>
-<script src="app.js?v=79"></script>
+<script src="app.js?v=80"></script>
 
 </body>
 </html>

@@ -1377,6 +1377,26 @@ if(document.getElementById('accordionSearchInput')){
   document.getElementById('accordionSearchInput').oninput = ()=> renderClientSelect();
 }
 
+if(document.getElementById('toggleElegirClienteBtn')){
+  document.getElementById('toggleElegirClienteBtn').onclick = ()=>{
+    const wrap = document.getElementById('elegirClienteWrap');
+    const btn = document.getElementById('toggleElegirClienteBtn');
+    const visible = wrap.style.display !== 'none';
+    wrap.style.display = visible ? 'none' : 'block';
+    btn.textContent = visible ? '👤 Elegir cliente para sacar foto' : 'Ocultar selector de cliente';
+  };
+}
+
+if(document.getElementById('toggleAgregarClienteBtn')){
+  document.getElementById('toggleAgregarClienteBtn').onclick = ()=>{
+    const wrap = document.getElementById('agregarClienteWrap');
+    const btn = document.getElementById('toggleAgregarClienteBtn');
+    const visible = wrap.style.display !== 'none';
+    wrap.style.display = visible ? 'none' : 'block';
+    btn.textContent = visible ? '➕ Agregar cliente nuevo' : 'Ocultar formulario de cliente nuevo';
+  };
+}
+
 if(document.getElementById('toggleClientListBtn')){
   document.getElementById('toggleClientListBtn').onclick = ()=>{
     const listEl = document.getElementById('clientList');

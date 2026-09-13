@@ -979,6 +979,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
           pagoLine.textContent = formatearLineaPago(c);
           setStatus('Pago de ' + c.nombre + ': pasó del ' + resultado.fechaAnterior + ' al ' + resultado.nuevaFecha + '.', 'ok');
           alert('✅ Listo — el pago de "' + c.nombre + '" pasó del ' + resultado.fechaAnterior + ' al ' + resultado.nuevaFecha + '.');
+          renderPagosRecientes();
         }
       }catch(err){
         setStatus('No se pudo actualizar el pago de ' + c.nombre + ': ' + err.message, 'err');
@@ -1416,22 +1417,24 @@ if(document.getElementById('toggleElegirClienteBtn')){
 }
 
 if(document.getElementById('toggleAgregarClienteBtn')){
-  document.getElementById('toggleAgregarClienteBtn').onclick = ()=>{
+  document.getElementById('toggleAgregarClienteBtn').onclick = async ()=>{
     const wrap = document.getElementById('agregarClienteWrap');
     const btn = document.getElementById('toggleAgregarClienteBtn');
     const visible = wrap.style.display !== 'none';
     wrap.style.display = visible ? 'none' : 'block';
     btn.textContent = visible ? '➕ Agregar cliente nuevo' : 'Ocultar formulario de cliente nuevo';
+    if(!visible) await renderClientesReserva();
   };
 }
 
 if(document.getElementById('toggleClientListBtn')){
-  document.getElementById('toggleClientListBtn').onclick = ()=>{
+  document.getElementById('toggleClientListBtn').onclick = async ()=>{
     const listEl = document.getElementById('clientList');
     const btn = document.getElementById('toggleClientListBtn');
     const visible = listEl.style.display !== 'none';
     listEl.style.display = visible ? 'none' : 'block';
     btn.textContent = visible ? 'Ver lista completa de clientes' : 'Ocultar lista de clientes';
+    if(!visible) await renderPagosRecientes();
   };
 }
 
@@ -1530,6 +1533,44 @@ async function renderListaGastos(accionFetch, contenedorId, accionBorrar){
 }
 async function renderGastosRecientes(){ return renderListaGastos('gastosRecientes', 'gastosRecientesList', 'borrarGasto'); }
 async function renderGastosYpfRecientes(){ return renderListaGastos('gastosYPFRecientes', 'gastosYpfRecientesList', 'borrarGastoYPF'); }
+
+// Lista de solo vista (sin botón de borrar) para corroborar que algo quedó
+// bien cargado — se usa para "Últimos pagos" y "Clientes con reserva".
+async function renderListaSoloVista(accionFetch, contenedorId, armarLinea){
+  const cont = document.getElementById(contenedorId);
+  if(!cont) return;
+  cont.innerHTML = '<div style="padding:8px; color:#8A9793; font-size:13px;">Buscando...</div>';
+  let items;
+  try{
+    items = await backendGet(accionFetch);
+  }catch(err){
+    cont.innerHTML = '<div style="padding:8px; color:#B4432B; font-size:13px;">No se pudo traer la lista: ' + escapeHtml(err.message) + '</div>';
+    return;
+  }
+  if(!items || items.length === 0){
+    cont.innerHTML = '<div style="padding:8px; color:#8A9793; font-size:13px;">Todavía no hay nada acá.</div>';
+    return;
+  }
+  cont.innerHTML = '';
+  items.forEach(it=>{
+    const item = document.createElement('div');
+    item.style.cssText = 'padding:8px 4px; border-bottom:1px solid var(--line); font-size:13px;';
+    item.innerHTML = armarLinea(it);
+    cont.appendChild(item);
+  });
+}
+
+async function renderPagosRecientes(){
+  return renderListaSoloVista('pagosRecientes', 'pagosRecientesList', p =>
+    `<div style="display:flex; justify-content:space-between;"><div><div style="font-weight:600;">${escapeHtml(p.nombre)}</div><div style="color:#8A9793; font-size:11.5px;">${escapeHtml(p.fecha)}${p.codigo ? (' — ' + escapeHtml(p.codigo)) : ''}</div></div><span style="font-weight:700;">${escapeHtml(p.monto || '')}</span></div>`
+  );
+}
+
+async function renderClientesReserva(){
+  return renderListaSoloVista('clientesEnReserva', 'clientesReservaList', c =>
+    `<div style="font-weight:600;">${escapeHtml(c.nombre)}</div><div style="color:#8A9793; font-size:11.5px;">${escapeHtml(c.direccion || '')}</div>`
+  );
+}
 
 if(document.getElementById('agregarGastoBtn')){
   document.getElementById('agregarGastoBtn').onclick = async ()=>{
@@ -1689,6 +1730,7 @@ if(document.getElementById('addClientBtn')){
       renderClientSelect();
       renderClientList();
       setStatus('✅ Cliente agregado: ' + name + (addr ? (' — ' + addr) : ''), 'ok');
+      await renderClientesReserva();
       alert('✅ Listo — se agregó a "' + name + '"' + (addr ? (' — ' + addr) : '') + '.');
     }catch(err){
       setStatus('No se pudo agregar: ' + err.message, 'err');
@@ -1874,6 +1916,7 @@ function crearFilaPagoGenerica(o, hojaDestino){
         pagoLine.textContent = formatearLineaPago(o);
         setStatus('Pago de ' + o.nombre + ': pasó del ' + resultado.fechaAnterior + ' al ' + resultado.nuevaFecha + '.', 'ok');
           alert('✅ Listo — el pago de "' + o.nombre + '" pasó del ' + resultado.fechaAnterior + ' al ' + resultado.nuevaFecha + '.');
+          renderPagosRecientes();
       }
     }catch(err){
       setStatus('No se pudo actualizar el pago de ' + o.nombre + ': ' + err.message, 'err');

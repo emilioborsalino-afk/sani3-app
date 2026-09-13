@@ -306,12 +306,20 @@
       <button type="button" id="buscarMapsNuevoClienteBtn" style="flex:1; background:var(--teal); color:#fff; font-family:var(--body); font-weight:600; font-size:12.5px; padding:7px; border-radius:6px;">🗺️ Abrir Maps</button>
     </div>
     <button class="btn-small" id="addClientBtn" style="width:100%; margin-top:10px;">Agregar</button>
+    <div style="margin-top:14px;">
+      <div style="font-weight:700; font-size:13px; color:#8A9793; margin-bottom:6px;">Clientes con reserva (para corroborar)</div>
+      <div id="clientesReservaList"></div>
+    </div>
     </div>
     <div class="solo-dueno">
       <button id="toggleClientListBtn" style="width:100%; margin-top:8px; background:var(--amber); color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px;">Ver lista completa de clientes</button>
       <div id="clientList" style="display:none;">
         <input class="client-input" id="clientListSearchInput" placeholder="🔎 Buscar por nombre..." style="width:100%; box-sizing:border-box; margin-bottom:8px;">
         <div id="clientListResults"></div>
+        <div style="margin-top:14px;">
+          <div style="font-weight:700; font-size:13px; color:#8A9793; margin-bottom:6px;">Últimos pagos ("Sumar 1 mes"), para corroborar</div>
+          <div id="pagosRecientesList"></div>
+        </div>
       </div>
       <button id="toggleGastosBtn" style="width:100%; margin-top:8px; background:var(--green); color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px;">💸 Gastos</button>
       <div id="gastosWrap" style="display:none;">
@@ -399,7 +407,7 @@
 </div>
 
 <script>window.MODO_EMPLEADO = false;</script>
-<script src="app.js?v=85"></script>
+<script src="app.js?v=86"></script>
 
 </body>
 </html>

@@ -1623,14 +1623,19 @@ async function renderPagosRecientes(){
     info.innerHTML = `<div style="font-weight:600;">${escapeHtml(p.nombre)}</div><div style="color:#8A9793; font-size:11.5px;">${escapeHtml(p.fecha)}${p.codigo ? (' — ' + escapeHtml(p.codigo)) : ''}</div>`;
     item.appendChild(info);
 
+    // Monto y lápiz juntos, pegados uno al lado del otro, a la derecha —
+    // antes quedaban repartidos por separado a lo largo de la fila.
+    const montoYBoton = document.createElement('div');
+    montoYBoton.style.cssText = 'display:flex; align-items:center; gap:6px; flex-shrink:0;';
+
     const montoSpan = document.createElement('span');
     montoSpan.style.cssText = 'font-weight:700; white-space:nowrap;';
     montoSpan.textContent = p.monto || '';
-    item.appendChild(montoSpan);
+    montoYBoton.appendChild(montoSpan);
 
     const btnMonto = document.createElement('button');
     btnMonto.textContent = '✏️';
-    btnMonto.style.cssText = 'color:#8A6D3B; margin-left:6px;';
+    btnMonto.style.cssText = 'color:#8A6D3B;';
     btnMonto.onclick = async ()=>{
       const nuevoTexto = prompt('Nuevo monto para "' + nombreReal + '" (esta fila del gasto, no el monto de contratación del cliente):', (p.monto || '').replace('$', '').trim());
       if(nuevoTexto === null || nuevoTexto.trim() === '') return;
@@ -1650,7 +1655,8 @@ async function renderPagosRecientes(){
       }
       btnMonto.disabled = false;
     };
-    item.appendChild(btnMonto);
+    montoYBoton.appendChild(btnMonto);
+    item.appendChild(montoYBoton);
 
     cont.appendChild(item);
   });

@@ -5,6 +5,20 @@ if(window.MODO_EMPLEADO){
 const BACKEND_URL_KEY = 'sani3_backend_url';
 
 let backendUrl = '';
+let usuarioActual = localStorage.getItem('sani3_usuario') || ''; // "Emilio" o "Mariano" — se pregunta una sola vez por celular, solo en la app del dueño
+
+if(document.getElementById('identidadOverlay')){
+  if(!usuarioActual){
+    document.getElementById('identidadOverlay').style.display = 'flex';
+  }
+  document.querySelectorAll('.identidad-btn').forEach(btn=>{
+    btn.onclick = ()=>{
+      usuarioActual = btn.dataset.usuario;
+      localStorage.setItem('sani3_usuario', usuarioActual);
+      document.getElementById('identidadOverlay').style.display = 'none';
+    };
+  });
+}
 let reconexionTimer = null; // si falla la conexión, guarda el temporizador que sigue reintentando solo, en el fondo
 let clients = [];
 let records = [];
@@ -970,7 +984,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
       btnPago.textContent = 'Guardando...';
       btnPago.disabled = true;
       try{
-        const resultado = await backendPost({ action:'sumarUnMesPago', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '' });
+        const resultado = await backendPost({ action:'sumarUnMesPago', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', usuario: usuarioActual });
         if(resultado && resultado.error){
           setStatus('No se pudo actualizar el pago de ' + c.nombre + ': ' + resultado.error, 'err');
           alert('❌ No se pudo actualizar el pago de ' + c.nombre + ':\n\n' + resultado.error);
@@ -1001,7 +1015,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
       btnMonto.textContent = 'Guardando...';
       btnMonto.disabled = true;
       try{
-        const resultado = await backendPost({ action:'actualizarMontoPago', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', monto: nuevoTexto });
+        const resultado = await backendPost({ action:'actualizarMontoPago', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', monto: nuevoTexto, usuario: usuarioActual });
         if(resultado && resultado.error){
           setStatus('No se pudo actualizar el monto de ' + c.nombre + ': ' + resultado.error, 'err');
           alert('❌ No se pudo actualizar el monto de ' + c.nombre + ':\n\n' + resultado.error);
@@ -1031,7 +1045,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
       btnCortar.textContent = 'Moviendo...';
       btnCortar.disabled = true;
       try{
-        const resultado = await backendPost({ action:'cortarClienteAlFinal', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '' });
+        const resultado = await backendPost({ action:'cortarClienteAlFinal', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', usuario: usuarioActual });
         if(resultado && resultado.error){
           setStatus('No se pudo cortar a ' + c.nombre + ': ' + resultado.error, 'err');
           alert('❌ No se pudo cortar a ' + c.nombre + ':\n\n' + resultado.error);
@@ -1064,7 +1078,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
       btnADeuda.textContent = 'Moviendo...';
       btnADeuda.disabled = true;
       try{
-        const resultado = await backendPost({ action:'cortarClienteADeuda', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '' });
+        const resultado = await backendPost({ action:'cortarClienteADeuda', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', usuario: usuarioActual });
         if(resultado && resultado.error){
           setStatus('No se pudo mover a ' + c.nombre + ': ' + resultado.error, 'err');
           alert('❌ No se pudo mover a ' + c.nombre + ':\n\n' + resultado.error);
@@ -1104,7 +1118,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
       btnNota.textContent = 'Guardando...';
       btnNota.disabled = true;
       try{
-        await backendPost({ action:'actualizarObservacionCliente', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', texto: nuevoTexto });
+        await backendPost({ action:'actualizarObservacionCliente', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', texto: nuevoTexto, usuario: usuarioActual });
         c.observacion = nuevoTexto.trim();
         // Recalculamos localmente los indicadores que dependen del texto, para
         // que se vea bien al toque sin tener que esperar el próximo refresco.
@@ -1470,6 +1484,22 @@ if(document.getElementById('toggleGastosYpfBtn')){
   };
 }
 
+if(document.getElementById('toggleRegistroAccionesBtn')){
+  document.getElementById('toggleRegistroAccionesBtn').onclick = async ()=>{
+    const wrap = document.getElementById('registroAccionesWrap');
+    const btn = document.getElementById('toggleRegistroAccionesBtn');
+    const visible = wrap.style.display !== 'none';
+    if(visible){
+      wrap.style.display = 'none';
+      btn.textContent = '📋 Registro de acciones (quién hizo qué)';
+      return;
+    }
+    wrap.style.display = 'block';
+    btn.textContent = 'Ocultar registro de acciones';
+    await renderRegistroAcciones();
+  };
+}
+
 async function renderListaGastos(accionFetch, contenedorId, accionBorrar){
   const cont = document.getElementById(contenedorId);
   if(!cont) return;
@@ -1511,7 +1541,7 @@ async function renderListaGastos(accionFetch, contenedorId, accionBorrar){
         // Mandamos el monto en limpio (sin el símbolo $) — el backend ahora
         // compara por el número real, así que no hace falta que coincida
         // el formato exacto del texto.
-        const resultado = await backendPost({ action:accionBorrar, fila: g.fila, descripcion: g.descripcion, monto: (g.monto||'').replace('$','').trim() });
+        const resultado = await backendPost({ action:accionBorrar, fila: g.fila, descripcion: g.descripcion, monto: (g.monto||'').replace('$','').trim(), usuario: usuarioActual });
         if(resultado && resultado.error){
           setStatus('No se pudo borrar: ' + resultado.error, 'err');
           alert('❌ No se pudo borrar el gasto:\n\n' + resultado.error);
@@ -1561,9 +1591,95 @@ async function renderListaSoloVista(accionFetch, contenedorId, armarLinea){
 }
 
 async function renderPagosRecientes(){
-  return renderListaSoloVista('pagosRecientes', 'pagosRecientesList', p =>
-    `<div style="display:flex; justify-content:space-between;"><div><div style="font-weight:600;">${escapeHtml(p.nombre)}</div><div style="color:#8A9793; font-size:11.5px;">${escapeHtml(p.fecha)}${p.codigo ? (' — ' + escapeHtml(p.codigo)) : ''}</div></div><span style="font-weight:700;">${escapeHtml(p.monto || '')}</span></div>`
-  );
+  const cont = document.getElementById('pagosRecientesList');
+  if(!cont) return;
+  cont.innerHTML = '<div style="padding:8px; color:#8A9793; font-size:13px;">Buscando...</div>';
+  let pagos;
+  try{
+    pagos = await backendGet('pagosRecientes');
+  }catch(err){
+    cont.innerHTML = '<div style="padding:8px; color:#B4432B; font-size:13px;">No se pudo traer la lista: ' + escapeHtml(err.message) + '</div>';
+    return;
+  }
+  if(!pagos || pagos.length === 0){
+    cont.innerHTML = '<div style="padding:8px; color:#8A9793; font-size:13px;">Todavía no hay nada acá.</div>';
+    return;
+  }
+  cont.innerHTML = '';
+  pagos.forEach(p=>{
+    // "Gastos 15-4-24" no guarda la dirección del cliente — si hay dos
+    // clientes con el mismo nombre en distintas direcciones, este botón de
+    // acá podría no distinguirlos bien. Para ese caso puntual, mejor usar
+    // el botón de Monto desde "Ver lista completa de clientes", que sí
+    // compara por nombre Y dirección juntos.
+    const esObrador = p.nombre.indexOf('Obrador - ') === 0;
+    const hoja = esObrador ? 'Obradores' : 'Registro Alquileres';
+    const nombreReal = esObrador ? p.nombre.slice('Obrador - '.length) : p.nombre;
+
+    const item = document.createElement('div');
+    item.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:8px 4px; border-bottom:1px solid var(--line); font-size:13px;';
+
+    const info = document.createElement('div');
+    info.innerHTML = `<div style="font-weight:600;">${escapeHtml(p.nombre)}</div><div style="color:#8A9793; font-size:11.5px;">${escapeHtml(p.fecha)}${p.codigo ? (' — ' + escapeHtml(p.codigo)) : ''}</div>`;
+    item.appendChild(info);
+
+    const montoSpan = document.createElement('span');
+    montoSpan.style.cssText = 'font-weight:700; white-space:nowrap;';
+    montoSpan.textContent = p.monto || '';
+    item.appendChild(montoSpan);
+
+    const btnMonto = document.createElement('button');
+    btnMonto.textContent = '✏️';
+    btnMonto.style.cssText = 'color:#8A6D3B; margin-left:6px;';
+    btnMonto.onclick = async ()=>{
+      const nuevoTexto = prompt('Nuevo monto para "' + nombreReal + '" (esta fila del gasto, no el monto de contratación del cliente):', (p.monto || '').replace('$', '').trim());
+      if(nuevoTexto === null || nuevoTexto.trim() === '') return;
+      btnMonto.disabled = true;
+      try{
+        const resultado = await backendPost({ action:'actualizarMontoPago', hoja, nombre: nombreReal, direccion: '', monto: nuevoTexto, usuario: usuarioActual });
+        if(resultado && resultado.error){
+          setStatus('No se pudo actualizar el monto: ' + resultado.error, 'err');
+          alert('❌ No se pudo actualizar el monto:\n\n' + resultado.error);
+        } else {
+          montoSpan.textContent = resultado.monto;
+          setStatus('Monto actualizado: ' + nombreReal, 'ok');
+        }
+      }catch(err){
+        setStatus('No se pudo actualizar el monto: ' + err.message, 'err');
+        alert('❌ No se pudo actualizar el monto:\n\n' + err.message);
+      }
+      btnMonto.disabled = false;
+    };
+    item.appendChild(btnMonto);
+
+    cont.appendChild(item);
+  });
+}
+
+async function renderRegistroAcciones(){
+  const cont = document.getElementById('registroAccionesList');
+  if(!cont) return;
+  cont.innerHTML = '<div style="padding:8px; color:#8A9793; font-size:13px;">Buscando...</div>';
+  let items;
+  try{
+    items = await backendGet('registroAcciones');
+  }catch(err){
+    cont.innerHTML = '<div style="padding:8px; color:#B4432B; font-size:13px;">No se pudo traer el registro: ' + escapeHtml(err.message) + '</div>';
+    return;
+  }
+  if(!items || items.length === 0){
+    cont.innerHTML = '<div style="padding:8px; color:#8A9793; font-size:13px;">Todavía no hay acciones anotadas.</div>';
+    return;
+  }
+  cont.innerHTML = '';
+  items.forEach(it=>{
+    const item = document.createElement('div');
+    item.style.cssText = 'padding:8px 4px; border-bottom:1px solid var(--line); font-size:12.5px;';
+    item.innerHTML = `<div style="font-weight:700;">${escapeHtml(it.usuario || it.quien || '')} — ${escapeHtml(it.accion)}</div>` +
+      `<div style="color:#8A9793;">${escapeHtml(it.fechaHora || it.fecha || '')}</div>` +
+      `<div style="margin-top:2px;">${escapeHtml(it.detalle || '')}</div>`;
+    cont.appendChild(item);
+  });
 }
 
 async function renderClientesReserva(){
@@ -1593,7 +1709,7 @@ if(document.getElementById('agregarGastoBtn')){
     btn.textContent = 'Agregando...';
     btn.disabled = true;
     try{
-      await backendPost({ action:'agregarGastoDirecto', descripcion, monto, pago: pagoInput.value });
+      await backendPost({ action:'agregarGastoDirecto', descripcion, monto, pago: pagoInput.value, usuario: usuarioActual });
       descInput.value = '';
       montoInput.value = '';
       pagoInput.value = '';
@@ -1624,7 +1740,7 @@ if(document.getElementById('agregarGastoYpfBtn')){
     btn.textContent = 'Agregando...';
     btn.disabled = true;
     try{
-      await backendPost({ action:'agregarGastoYPF', descripcion, monto });
+      await backendPost({ action:'agregarGastoYPF', descripcion, monto, usuario: usuarioActual });
       descInput.value = '';
       montoInput.value = '';
       setStatus('✅ Gasto YPF agregado: ' + descripcion, 'ok');
@@ -1717,7 +1833,7 @@ if(document.getElementById('addClientBtn')){
     btn.textContent = 'Agregando...';
     btn.disabled = true;
     try{
-      await backendPost({ action:'addClient', nombre: name, direccion: addr, ubicacionFija: nuevaUbicacionFija, fechaInicio, cantidad, motivo, colorElegido });
+      await backendPost({ action:'addClient', nombre: name, direccion: addr, ubicacionFija: nuevaUbicacionFija, fechaInicio, cantidad, motivo, colorElegido, usuario: usuarioActual });
       clients.push({ nombre: name, direccion: addr, dia:'', telefono:'', fechaInicio: fechaInicio || '', ubicacionFija: nuevaUbicacionFija, cantidad: cantidad || '', motivo: motivo || '', colorReserva: colorElegido || '' });
       input.value = '';
       addrInput.value = '';
@@ -1797,7 +1913,7 @@ if(document.getElementById('empFotoInput')){
       const ubicacionFijaNueva = ubic ? `https://maps.google.com/?q=${ubic.lat},${ubic.lon}` : '';
       if(!yaExiste){
         try{
-          await backendPost({ action:'addClient', nombre, direccion, ubicacionFija: ubicacionFijaNueva });
+          await backendPost({ action:'addClient', nombre, direccion, ubicacionFija: ubicacionFijaNueva, usuario: usuarioActual });
           clients.push({ nombre, direccion, dia:'', telefono:'', fechaInicio:'', ubicacionFija: ubicacionFijaNueva });
         }catch(errCliente){ /* si falla, seguimos igual con el registro del servicio */ }
       }
@@ -1907,7 +2023,7 @@ function crearFilaPagoGenerica(o, hojaDestino){
     btnPago.textContent = 'Guardando...';
     btnPago.disabled = true;
     try{
-      const resultado = await backendPost({ action:'sumarUnMesPago', hoja:hojaDestino, nombre: o.nombre, direccion: o.direccion || '' });
+      const resultado = await backendPost({ action:'sumarUnMesPago', hoja:hojaDestino, nombre: o.nombre, direccion: o.direccion || '', usuario: usuarioActual });
       if(resultado && resultado.error){
         setStatus('No se pudo actualizar el pago de ' + o.nombre + ': ' + resultado.error, 'err');
           alert('❌ No se pudo actualizar el pago de ' + o.nombre + ':\n\n' + resultado.error);
@@ -1937,7 +2053,7 @@ function crearFilaPagoGenerica(o, hojaDestino){
     btnMonto.textContent = 'Guardando...';
     btnMonto.disabled = true;
     try{
-      const resultado = await backendPost({ action:'actualizarMontoPago', hoja:hojaDestino, nombre: o.nombre, direccion: o.direccion || '', monto: nuevoTexto });
+      const resultado = await backendPost({ action:'actualizarMontoPago', hoja:hojaDestino, nombre: o.nombre, direccion: o.direccion || '', monto: nuevoTexto, usuario: usuarioActual });
       if(resultado && resultado.error){
         setStatus('No se pudo actualizar el monto de ' + o.nombre + ': ' + resultado.error, 'err');
           alert('❌ No se pudo actualizar el monto de ' + o.nombre + ':\n\n' + resultado.error);
@@ -1965,7 +2081,7 @@ function crearFilaPagoGenerica(o, hojaDestino){
     btnObs.textContent = 'Guardando...';
     btnObs.disabled = true;
     try{
-      await backendPost({ action:'actualizarObservacionCliente', hoja:hojaDestino, nombre: o.nombre, direccion: o.direccion || '', texto: nuevoTexto });
+      await backendPost({ action:'actualizarObservacionCliente', hoja:hojaDestino, nombre: o.nombre, direccion: o.direccion || '', texto: nuevoTexto, usuario: usuarioActual });
       o.observacion = nuevoTexto.trim();
       setStatus('Observación de ' + o.nombre + ' actualizada.', 'ok');
       renderClientList();
@@ -1988,7 +2104,7 @@ function crearFilaPagoGenerica(o, hojaDestino){
     btnCortar.textContent = 'Moviendo...';
     btnCortar.disabled = true;
     try{
-      const resultado = await backendPost({ action:'cortarClienteAlFinal', hoja:hojaDestino, nombre: o.nombre, direccion: o.direccion || '' });
+      const resultado = await backendPost({ action:'cortarClienteAlFinal', hoja:hojaDestino, nombre: o.nombre, direccion: o.direccion || '', usuario: usuarioActual });
       if(resultado && resultado.error){
         setStatus('No se pudo cortar a ' + o.nombre + ': ' + resultado.error, 'err');
           alert('❌ No se pudo cortar a ' + o.nombre + ':\n\n' + resultado.error);
@@ -2021,7 +2137,7 @@ function crearFilaPagoGenerica(o, hojaDestino){
     btnADeuda.textContent = 'Moviendo...';
     btnADeuda.disabled = true;
     try{
-      const resultado = await backendPost({ action:'cortarClienteADeuda', hoja:hojaDestino, nombre: o.nombre, direccion: o.direccion || '' });
+      const resultado = await backendPost({ action:'cortarClienteADeuda', hoja:hojaDestino, nombre: o.nombre, direccion: o.direccion || '', usuario: usuarioActual });
       if(resultado && resultado.error){
         setStatus('No se pudo mover a ' + o.nombre + ': ' + resultado.error, 'err');
           alert('❌ No se pudo mover a ' + o.nombre + ':\n\n' + resultado.error);

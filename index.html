@@ -234,6 +234,15 @@
 </head>
 <body>
 
+<div id="identidadOverlay" style="display:none; position:fixed; inset:0; z-index:10000; background:rgba(10,20,18,0.92); align-items:center; justify-content:center; flex-direction:column; padding:24px;">
+  <div style="background:#16211F; border-radius:14px; padding:24px; max-width:360px; width:100%; text-align:center;">
+    <div style="font-family:var(--disp); font-weight:700; font-size:18px; color:#fff; margin-bottom:8px;">¿Quién sos?</div>
+    <div style="color:#8A9793; font-size:13px; margin-bottom:18px;">Para saber quién hizo cada cambio (pagos, montos, gastos). Se pregunta una sola vez en este celular.</div>
+    <button type="button" class="identidad-btn" data-usuario="Emilio" style="width:100%; background:var(--teal); color:#fff; font-family:var(--body); font-weight:600; font-size:15px; padding:12px; border-radius:8px; margin-bottom:10px;">Emilio</button>
+    <button type="button" class="identidad-btn" data-usuario="Mariano" style="width:100%; background:var(--amber); color:#fff; font-family:var(--body); font-weight:600; font-size:15px; padding:12px; border-radius:8px;">Mariano</button>
+  </div>
+</div>
+
 <div id="fatalErrorBanner"></div>
 <div id="noCerrarBanner" style="display:none; position:fixed; top:0; left:0; right:0; z-index:9999; background:#B4432B; color:#fff; text-align:center; padding:10px 14px; font-weight:700; font-size:13.5px;">⏳ No cierres la app todavía — guardando la foto...</div>
 <div id="connBadgeFijo" style="position:fixed; top:8px; right:8px; z-index:9998; background:rgba(20,30,28,0.88); border-radius:14px; padding:5px 10px; font-family:var(--body); font-size:11px; color:#fff; display:flex; align-items:center; gap:5px; box-shadow:0 1px 4px rgba(0,0,0,0.3);">
@@ -352,6 +361,11 @@
           <div id="gastosYpfRecientesList"></div>
         </div>
       </div>
+
+      <button id="toggleRegistroAccionesBtn" style="width:100%; margin-top:8px; background:#5B5347; color:#fff; font-family:var(--body); font-weight:600; font-size:13px; padding:9px; border-radius:6px;">📋 Registro de acciones (quién hizo qué)</button>
+      <div id="registroAccionesWrap" style="display:none; margin-top:6px;">
+        <div id="registroAccionesList"></div>
+      </div>
     </div>
   </div>
 
@@ -407,7 +421,7 @@
 </div>
 
 <script>window.MODO_EMPLEADO = false;</script>
-<script src="app.js?v=86"></script>
+<script src="app.js?v=87"></script>
 
 </body>
 </html>

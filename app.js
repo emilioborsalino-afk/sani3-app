@@ -720,7 +720,7 @@ function renderClientSelect(){
       const c = clients[i];
       const item = document.createElement('div');
       item.dataset.idx = i;
-      const fondoSuspendido = c.suspendido ? '#F3E8FF' : (selectedClientIndex===i ? '#E3ECEA' : '#fff');
+      const fondoSuspendido = c.suspendido ? '#E3F2FA' : (selectedClientIndex===i ? '#E3ECEA' : '#fff');
       item.style.cssText = 'display:flex; align-items:stretch; border-top:1px solid var(--line); background:' + fondoSuspendido + ';';
 
       const btnInfo = document.createElement('button');
@@ -765,7 +765,7 @@ function renderClientSelect(){
         }
       }
       const avisoSuspendido = c.suspendido
-        ? `<br><span style="color:#6A0DAD; font-weight:700; font-size:12.5px;">🚫 SUSPENDIDO — no desagotar hasta reactivar</span>`
+        ? `<br><span style="color:#1E6FA3; font-weight:700; font-size:12.5px;">🔵 SUSPENDIDO — no desagotar hasta reactivar</span>`
         : '';
       // Estos dos avisos son visibles TANTO en la app del dueño como en la
       // de empleados (a diferencia de "amarillo", que sigue siendo solo

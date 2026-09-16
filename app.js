@@ -720,8 +720,12 @@ function renderClientSelect(){
       const c = clients[i];
       const item = document.createElement('div');
       item.dataset.idx = i;
-      const fondoSuspendido = c.suspendido ? '#E3F2FA' : (selectedClientIndex===i ? '#E3ECEA' : '#fff');
-      item.style.cssText = 'display:flex; align-items:stretch; border-top:1px solid var(--line); background:' + fondoSuspendido + ';';
+      let fondoFila = '#fff';
+      if(c.suspendido) fondoFila = '#E3F2FA'; // celeste clarito
+      else if(c.marcaRetiro === 'lila') fondoFila = '#F3E8FF'; // lila clarito
+      else if(c.marcaRetiro === 'rojo') fondoFila = '#FBE1DE'; // rojo clarito
+      else if(selectedClientIndex === i) fondoFila = '#E3ECEA';
+      item.style.cssText = 'display:flex; align-items:stretch; border-top:1px solid var(--line); background:' + fondoFila + ';';
 
       const btnInfo = document.createElement('button');
       btnInfo.type = 'button';

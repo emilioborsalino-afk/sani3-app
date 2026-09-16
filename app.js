@@ -767,9 +767,18 @@ function renderClientSelect(){
       const avisoSuspendido = c.suspendido
         ? `<br><span style="color:#6A0DAD; font-weight:700; font-size:12.5px;">🚫 SUSPENDIDO — no desagotar hasta reactivar</span>`
         : '';
+      // Estos dos avisos son visibles TANTO en la app del dueño como en la
+      // de empleados (a diferencia de "amarillo", que sigue siendo solo
+      // para el dueño en "Ver lista completa de clientes").
+      let avisoRetiroOMudanza = '';
+      if(c.marcaRetiro === 'rojo'){
+        avisoRetiroOMudanza = `<br><span style="color:#B4432B; font-weight:700; font-size:12.5px;">🔴 RETIRAR</span>`;
+      } else if(c.marcaRetiro === 'lila'){
+        avisoRetiroOMudanza = `<br><span style="color:#6A0DAD; font-weight:700; font-size:12.5px;">🟣 SE MUDA DE LUGAR</span>`;
+      }
       btnInfo.innerHTML = (c.direccion
         ? `<strong>${escapeHtml(c.nombre)}</strong><br><span style="color:#8A9793; font-size:12.5px;">${escapeHtml(c.direccion)}</span>`
-        : `<strong>${escapeHtml(c.nombre)}</strong>`) + avisoSuspendido + extraReserva + check;
+        : `<strong>${escapeHtml(c.nombre)}</strong>`) + avisoSuspendido + avisoRetiroOMudanza + extraReserva + check;
       btnInfo.onclick = ()=>{
         if(c.suspendido){
           const seguro = confirm('⚠ "' + c.nombre + '" está marcado como SUSPENDIDO (por ejemplo, por falta de pago).\n\n¿Seguro que querés registrarle el servicio igual?');
@@ -887,6 +896,10 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
     const partesObsSusp = (c.observacion || '').split('|').map(p => p.trim());
     const notaSuspension = partesObsSusp.find(p => p.toLowerCase().indexOf('suspendido') === 0) || 'Suspendido';
     marcaTexto = ` <span style="color:#1E6FA3; font-weight:700; font-size:12px;">🔵 ${escapeHtml(notaSuspension)}</span>`;
+  } else if(c.marcaRetiro === 'lila'){
+    const partesObsMudanza = (c.observacion || '').split('|').map(p => p.trim());
+    const notaMudanza = partesObsMudanza.find(p => p.toLowerCase().indexOf('se muda') === 0) || 'Se muda';
+    marcaTexto = ` <span style="color:#6A0DAD; font-weight:700; font-size:12px;">🟣 ${escapeHtml(notaMudanza)}</span>`;
   } else if(c.marcaRetiro){
     // Buscamos el pedacito de la observación que empieza con "Retirar", para mostrar la fecha real puesta ahí.
     const partesObs = (c.observacion || '').split('|').map(p => p.trim());
@@ -911,7 +924,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
     const piezasObsGenericas = (c.observacion || '').split('|').map(p => p.trim()).filter(p => {
       if (!p) return false;
       const pl = p.toLowerCase();
-      return pl.indexOf('retirar') !== 0 && pl.indexOf('suspendido') !== 0;
+      return pl.indexOf('retirar') !== 0 && pl.indexOf('suspendido') !== 0 && pl.indexOf('se muda') !== 0;
     });
     if(piezasObsGenericas.length > 0){
       const obsLine = document.createElement('div');
@@ -1206,6 +1219,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
       <option value="rojo">🔴 Rojo (retirar)</option>
       <option value="amarillo">🟡 Amarillo (retirar)</option>
       <option value="celeste">🔵 Celeste (Suspendido)</option>
+      <option value="lila">🟣 Lila (se muda)</option>
       <option value="blanco">⚪ Quitar marca</option>
     `;
     if(c.marcaRetiro) selectColor.value = c.marcaRetiro;
@@ -1222,6 +1236,9 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
       let fechaTexto = '';
       if(color === 'rojo' || color === 'amarillo'){
         fechaTexto = prompt('¿Para cuándo hay que retirar el baño de "' + c.nombre + '"? (podés escribirla como quieras, por ejemplo: 24/7/26). Dejá vacío si todavía no sabés la fecha.', '');
+        if(fechaTexto === null) return; // canceló
+      } else if(color === 'lila'){
+        fechaTexto = prompt('¿Para cuándo se muda "' + c.nombre + '"? (podés escribirla como quieras, por ejemplo: 24/7/26). Dejá vacío si todavía no sabés la fecha.', '');
         if(fechaTexto === null) return; // canceló
       } else if(color === 'celeste'){
         const confirmado = confirm('¿Marcar a "' + c.nombre + '" como SUSPENDIDO (por ejemplo, por falta de pago)?\n\nLos empleados van a ver un aviso para no desagotarlo hasta que lo reactives.');

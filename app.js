@@ -29,6 +29,7 @@ let config = { companyName: 'Sani3' };
 let ubicacionActual = null;      // {lat, lon} de la última vez que se consiguió bien
 let obsFotosTemp = {};           // fotos de observación ya procesadas, esperando a que se guarden
 let ubicacionActualHora = null;  // Date de cuándo se consiguió
+let obradoresYaPedidos = false;  // para pedir "obradores"/"empresasConDeuda" una sola vez, recién al abrir "Ver lista completa de clientes" (no al conectar)
 
 const CLIENTES_PRECARGADOS = []; // ya no se usa: los clientes se leen en vivo desde Registro Alquileres
 
@@ -394,10 +395,13 @@ async function loadAllInterno(){
     const pedidosOpcionales = [
       backendGet('pendientesSemana').catch(()=>[]), // si falla, seguimos sin el listado extra, no es crítico
     ];
-    if(!window.MODO_EMPLEADO){
-      pedidosOpcionales.push(backendGet('obradores').catch(()=>[]));
-      pedidosOpcionales.push(backendGet('empresasConDeuda').catch(()=>[]));
-    }
+    // "obradores" y "empresasConDeuda" YA NO se piden acá: son 2 lecturas
+    // completas de hojas enteras de la planilla, y solo hacen falta dentro
+    // de "Ver lista completa de clientes" — una sección que arranca cerrada
+    // y puede que no se abra en toda la sesión. Pedirlos siempre acá hacía
+    // que la conexión de la app del dueño tardara más que la de empleados
+    // (que ni los pide). Ahora se piden recién al abrir esa sección — ver
+    // el botón "toggleClientListBtn" más abajo.
 
     const [configResult, clientsResult, recordsResult] = await Promise.all(pedidosPrincipales);
     const opcionalesResult = await Promise.all(pedidosOpcionales);
@@ -407,10 +411,6 @@ async function loadAllInterno(){
     records = recordsResult;
     document.getElementById('companyName').value = config.companyName || '';
     pendientesSemana = opcionalesResult[0] || [];
-    if(!window.MODO_EMPLEADO){
-      obradores = opcionalesResult[1] || [];
-      empresasConDeuda = opcionalesResult[2] || [];
-    }
 
     guardarCacheLocal();
     fusionarPendientesEnRecords();
@@ -1469,7 +1469,26 @@ if(document.getElementById('toggleClientListBtn')){
     const visible = listEl.style.display !== 'none';
     listEl.style.display = visible ? 'none' : 'block';
     btn.textContent = visible ? 'Ver lista completa de clientes' : 'Ocultar lista de clientes';
-    if(!visible) await renderPagosRecientes();
+    if(!visible){
+      // "Obradores" y "Empresas con deuda" se piden recién la primera vez
+      // que se abre esta sección (no al conectar) — así la conexión
+      // inicial es más rápida. Una vez pedidos, quedan en memoria para el
+      // resto de la sesión, no se vuelven a pedir cada vez que se abre.
+      if(!window.MODO_EMPLEADO && !obradoresYaPedidos){
+        try{
+          const [obradoresResult, deudaResult] = await Promise.all([
+            backendGet('obradores').catch(()=>[]),
+            backendGet('empresasConDeuda').catch(()=>[])
+          ]);
+          obradores = obradoresResult || [];
+          empresasConDeuda = deudaResult || [];
+          obradoresYaPedidos = true;
+          guardarCacheLocal();
+          renderClientList();
+        }catch(err){ /* si falla, esas dos secciones simplemente no aparecen */ }
+      }
+      await renderPagosRecientes();
+    }
   };
 }
 

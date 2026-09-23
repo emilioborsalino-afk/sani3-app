@@ -440,25 +440,38 @@ async function loadAllInterno(){
   }catch(err){
     setConnDot(false);
     // Si el error es justo por una clave de acceso mala (por ejemplo, si
-    // el dueño la cambió), la borramos para que la próxima vez que se
-    // intente conectar (el reintento de abajo, o "Actualizar") se vuelva
-    // a pedir en vez de insistir para siempre con la vieja.
+    // el dueño la cambió, o alguien la escribió mal), la tratamos DISTINTO
+    // a un problema de conexión real: no mostramos la copia guardada del
+    // celular (daría la falsa impresión de estar "adentro" sin la clave
+    // correcta) y tampoco reintentamos solos cada 8 segundos (eso hacía
+    // que el cartel pidiendo la clave apareciera una y otra vez solo,
+    // aunque nadie lo hubiera tocado). Se vacía la pantalla y queda
+    // esperando a que alguien mismo toque "Actualizar" o "Conectar" con
+    // la clave correcta.
     if(String(err.message || '').indexOf('Clave de acceso') !== -1){
       claveAcceso = '';
       try{ localStorage.removeItem(CLAVE_ACCESO_KEY); }catch(errLs){ /* nada */ }
-    }
-    const fechaCacheFalla = cargarCacheLocal();
-    fusionarPendientesEnRecords();
-    if(fechaCacheFalla){
-      setConnStatus('Sin conexión — trabajando con la copia guardada de las ' + fechaCacheFalla + '. Podés seguir sacando fotos, se suben solas cuando vuelva la conexión. Reintentando conectar solo en el fondo...', 'err');
+      clients = [];
+      records = [];
+      pendientesSemana = [];
+      obradores = [];
+      empresasConDeuda = [];
+      setConnStatus('Clave de acceso incorrecta — pedísela al dueño y tocá "Actualizar" para volver a intentar.', 'err');
+      if(reconexionTimer){ clearTimeout(reconexionTimer); reconexionTimer = null; }
     } else {
-      setConnStatus('Error al conectar: ' + err.message + ' — reintentando solo en el fondo...', 'err');
+      const fechaCacheFalla = cargarCacheLocal();
+      fusionarPendientesEnRecords();
+      if(fechaCacheFalla){
+        setConnStatus('Sin conexión — trabajando con la copia guardada de las ' + fechaCacheFalla + '. Podés seguir sacando fotos, se suben solas cuando vuelva la conexión. Reintentando conectar solo en el fondo...', 'err');
+      } else {
+        setConnStatus('Error al conectar: ' + err.message + ' — reintentando solo en el fondo...', 'err');
+      }
+      // Como esto es solo LEER datos (nunca cambia nada), es seguro reintentar
+      // todas las veces que haga falta sin arriesgar duplicar nada — a
+      // diferencia de guardar (fotos, pagos), que nunca se reintenta solo.
+      if(reconexionTimer) clearTimeout(reconexionTimer);
+      reconexionTimer = setTimeout(loadAll, 8000);
     }
-    // Como esto es solo LEER datos (nunca cambia nada), es seguro reintentar
-    // todas las veces que haga falta sin arriesgar duplicar nada — a
-    // diferencia de guardar (fotos, pagos), que nunca se reintenta solo.
-    if(reconexionTimer) clearTimeout(reconexionTimer);
-    reconexionTimer = setTimeout(loadAll, 8000);
   }
   const scrollAntes2 = window.scrollY;
   renderClientSelect();

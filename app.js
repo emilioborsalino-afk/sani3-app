@@ -3,9 +3,24 @@ if(window.MODO_EMPLEADO){
 }
 
 const BACKEND_URL_KEY = 'sani3_backend_url';
+const CLAVE_ACCESO_KEY = 'sani3_clave_acceso';
 
 let backendUrl = '';
+let claveAcceso = localStorage.getItem(CLAVE_ACCESO_KEY) || ''; // clave de acceso a la app — se pide una sola vez por celular
 let usuarioActual = localStorage.getItem('sani3_usuario') || ''; // "Emilio" o "Mariano" — se pregunta una sola vez por celular, solo en la app del dueño
+
+// Si todavía no hay clave guardada en este celular, la pide con un cartel
+// simple — una sola vez, después queda guardada. Se llama antes de
+// cualquier pedido al backend (backendGet/backendPost ya la llaman solas).
+function asegurarClaveAcceso(){
+  if(claveAcceso) return claveAcceso;
+  const ingresada = prompt('Clave de acceso de Sani3 (pedísela al dueño si no la tenés) — se pide una sola vez en este celular:', '');
+  if(ingresada && ingresada.trim()){
+    claveAcceso = ingresada.trim();
+    localStorage.setItem(CLAVE_ACCESO_KEY, claveAcceso);
+  }
+  return claveAcceso;
+}
 
 if(document.getElementById('identidadOverlay')){
   if(!usuarioActual){
@@ -280,7 +295,8 @@ function cargarJSONP(url){
 
 async function backendGet(action){
   if(!backendUrl) throw new Error('Todavía no conectaste el backend (pegá la URL arriba).');
-  const url = backendUrl + '?action=' + encodeURIComponent(action) + '&_=' + Date.now();
+  asegurarClaveAcceso();
+  const url = backendUrl + '?action=' + encodeURIComponent(action) + '&clave=' + encodeURIComponent(claveAcceso) + '&_=' + Date.now();
   try{
     const data = await cargarJSONP(url);
     if(data && data.error) throw new Error(data.error);
@@ -295,6 +311,7 @@ async function backendGet(action){
 }
 async function backendPost(payload){
   if(!backendUrl) throw new Error('Todavía no conectaste el backend (pegá la URL arriba).');
+  asegurarClaveAcceso();
   // OJO: acá NO reintentamos solos si algo falla — a diferencia de leer datos,
   // guardar/cambiar algo (sumar un pago, un monto, una observación, una foto)
   // no es seguro de repetir a ciegas: si el pedido en realidad SÍ llegó a
@@ -307,7 +324,7 @@ async function backendPost(payload){
     res = await fetch(backendUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
-      body: JSON.stringify(payload),
+      body: JSON.stringify(Object.assign({ clave: claveAcceso }, payload)),
       cache: 'no-store'
     });
   }catch(errRed){
@@ -422,6 +439,14 @@ async function loadAllInterno(){
     if(reconexionTimer){ clearTimeout(reconexionTimer); reconexionTimer = null; } // ya conectó, no hace falta seguir insistiendo
   }catch(err){
     setConnDot(false);
+    // Si el error es justo por una clave de acceso mala (por ejemplo, si
+    // el dueño la cambió), la borramos para que la próxima vez que se
+    // intente conectar (el reintento de abajo, o "Actualizar") se vuelva
+    // a pedir en vez de insistir para siempre con la vieja.
+    if(String(err.message || '').indexOf('Clave de acceso') !== -1){
+      claveAcceso = '';
+      try{ localStorage.removeItem(CLAVE_ACCESO_KEY); }catch(errLs){ /* nada */ }
+    }
     const fechaCacheFalla = cargarCacheLocal();
     fusionarPendientesEnRecords();
     if(fechaCacheFalla){
@@ -2827,15 +2852,16 @@ todayLabel();
 backendUrl = localStorage.getItem(BACKEND_URL_KEY) || '';
 
 // Si llegamos con ?backend=... (por ejemplo, volviendo desde "Compartir ubicación"),
-// lo usamos y lo guardamos, así no depende de que el celular comparta la memoria entre pantallas.
+// YA NO conecta ni guarda sola — por seguridad. Antes, con solo abrir un
+// link así (por ejemplo si quedaba guardado en el historial del navegador,
+// o alguien lo reenviaba sin darse cuenta), la app quedaba conectada para
+// siempre en ese celular, sin que nadie tuviera que confirmar nada. Ahora
+// solo PRELLENA el cuadro de texto — hace falta tocar "Conectar" a
+// propósito para que realmente se use y se guarde.
 const backendDesdeUrl = new URLSearchParams(location.search).get('backend');
-if(backendDesdeUrl){
-  backendUrl = backendDesdeUrl;
-  localStorage.setItem(BACKEND_URL_KEY, backendUrl);
-  history.replaceState(null, '', location.pathname); // limpiamos el ?backend=... de la barra de direcciones
-}
+history.replaceState(null, '', location.pathname); // limpiamos el parámetro de la barra de direcciones apenas lo leemos, se haya usado o no
 
-document.getElementById('backendUrlInput').value = backendUrl;
+document.getElementById('backendUrlInput').value = backendUrl || backendDesdeUrl || '';
 loadAll();
 
 if(location.protocol === 'file:' || location.protocol === 'content:'){

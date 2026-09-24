@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Guardar ubicación</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+  :root{
+    --bg: #F3F6F5; --ink: #15211E; --teal: #114B4B; --teal-deep: #0B3535;
+    --green: #2E7D5B; --card: #FFFFFF; --line: #D8E0DE;
+    --mono: 'IBM Plex Mono', monospace; --disp: 'Barlow Semi Condensed', sans-serif; --body: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--bg); color:var(--ink); font-family:var(--body); min-height:100vh; padding-bottom:40px;}
+  .topbar{background:var(--teal); color:#EFF7F5; padding:20px; position:sticky; top:0;}
+  .topbar h1{font-family:var(--disp); font-weight:800; font-size:19px; margin:0;}
+  .topbar .sub{font-family:var(--mono); font-size:12px; color:#9FC2BC; margin-top:4px;}
+  main{max-width:520px; margin:0 auto; padding:18px 16px 0;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; margin-top:12px;}
+  .card:active{background:#F0F5F3;}
+  .cliente{font-family:var(--disp); font-weight:700; font-size:16px; color:var(--teal-deep);}
+  .detalle{font-size:13px; color:#4A5854; margin-top:4px;}
+  .fecha{font-family:var(--mono); font-size:12px; color:#8A9793; margin-top:4px;}
+  .msg{text-align:center; color:#8A9793; font-size:14px; padding:40px 16px; font-family:var(--mono);}
+  .msg.ok{color:var(--green);}
+  .msg.err{color:#B4432B;}
+  button.card{width:100%; text-align:left; border:1px solid var(--line); cursor:pointer; font:inherit;}
+  .link-detectado{
+    font-family:var(--mono); font-size:11px; color:#4A5854; word-break:break-all;
+    background:#EFF7F5; border-radius:6px; padding:8px 10px; margin:0 16px 14px;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Guardar ubicación</h1>
+  <div class="sub">Elegí a qué servicio corresponde este lugar</div>
+  <a href="./index.html" id="volverAppLinkTop" style="display:inline-block; margin-top:12px; padding:8px 14px; background:rgba(255,255,255,0.15); color:#EFF7F5; border-radius:8px; text-decoration:none; font-family:var(--body); font-weight:600; font-size:13px;">← Volver a la app</a>
+</div>
+
+<div class="link-detectado" id="linkDetectado"></div>
+
+<main id="main">
+  <div class="msg">Cargando servicios pendientes de ubicación...</div>
+</main>
+
+<script>
+const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbxfGtx6vPMVW7yh8ZB2MREZybPBAmkgEgT6K9aumXNfn_8yDSIRY_QWhP-E_gQEVT9MfA/exec';
+
+// Misma clave que usa la app (app.js) — como esta página vive en el mismo
+// sitio, comparte el mismo localStorage: si ya la pusiste una vez en la
+// app, esta pantalla la encuentra guardada sola, sin volver a preguntar.
+// Si por algún motivo no está guardada acá (por ejemplo, entraste
+// directo a este link sin haber abierto la app antes en este celular),
+// la pide una sola vez con un cartel simple.
+const CLAVE_ACCESO_KEY = 'sani3_clave_acceso';
+let claveAcceso = localStorage.getItem(CLAVE_ACCESO_KEY) || '';
+function asegurarClaveAcceso(){
+  if(claveAcceso) return claveAcceso;
+  const ingresada = prompt('Clave de acceso de Sani3:');
+  if(ingresada){
+    claveAcceso = ingresada.trim();
+    localStorage.setItem(CLAVE_ACCESO_KEY, claveAcceso);
+  }
+  return claveAcceso;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function formatDateTime(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'2-digit'}) + '  ' +
+    d.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+}
+
+function cargarJSONP(url){
+  return new Promise((resolve, reject)=>{
+    const cbName = 'jsonp_cb_' + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+    const timer = setTimeout(()=>{ limpiar(); reject(new Error('se agotó el tiempo de espera')); }, 12000);
+    function limpiar(){ clearTimeout(timer); delete window[cbName]; script.remove(); }
+    window[cbName] = (data)=>{ limpiar(); resolve(data); };
+    script.onerror = ()=>{ limpiar(); reject(new Error('no se pudo conectar al servidor')); };
+    script.src = url + (url.indexOf('?') > -1 ? '&' : '?') + 'callback=' + cbName;
+    document.body.appendChild(script);
+  });
+}
+
+function extraerLink(texto){
+  if(!texto) return '';
+  const m = texto.match(/https?:\/\/\S+/);
+  return m ? m[0] : '';
+}
+
+async function init(){
+  const params = new URLSearchParams(location.search);
+  // Google Maps comparte normalmente en el campo "text" (a veces "url")
+  const compartido = params.get('text') || params.get('url') || params.get('title') || '';
+  const link = extraerLink(compartido);
+
+  const linkBox = document.getElementById('linkDetectado');
+  const main = document.getElementById('main');
+
+  if(!link){
+    // En computadora no existe el "compartir a una app" como en el celular,
+    // así que dejamos pegar el link a mano acá.
+    linkBox.style.display = 'none';
+    main.innerHTML = `
+      <div class="card" style="cursor:default;">
+        <div style="font-family:var(--disp); font-weight:700; font-size:15px; color:var(--teal-deep); margin-bottom:10px;">Pegá el link de Google Maps</div>
+        <div style="font-size:12.5px; color:#8A9793; margin-bottom:10px;">En el celular esto se hace tocando "Compartir → Sani3" desde Maps. En la computadora, copiá el link de Maps y pegalo acá:</div>
+        <input id="linkManualInput" type="text" placeholder="https://maps.app.goo.gl/..." style="width:100%; box-sizing:border-box; padding:10px; border:1px solid var(--line); border-radius:8px; font-family:var(--mono); font-size:13px; margin-bottom:10px;">
+        <button id="btnContinuarManual" style="width:100%; padding:12px; background:var(--teal); color:#fff; border-radius:8px; font-weight:700;">Continuar</button>
+      </div>
+    `;
+    document.getElementById('btnContinuarManual').onclick = ()=>{
+      const valor = document.getElementById('linkManualInput').value.trim();
+      const linkManual = extraerLink(valor) || valor;
+      if(!linkManual){
+        main.insertAdjacentHTML('beforeend', '<div class="msg err">Pegá un link válido de Google Maps.</div>');
+        return;
+      }
+      linkBox.style.display = 'block';
+      linkBox.textContent = '📍 ' + linkManual;
+      mostrarOpcionesModo(linkManual);
+    };
+    return;
+  }
+  linkBox.textContent = '📍 ' + link;
+  mostrarOpcionesModo(link);
+}
+
+function mostrarOpcionesModo(link){
+  const main = document.getElementById('main');
+  main.innerHTML = `
+    <div class="card" style="cursor:default;">
+      <div style="font-family:var(--disp); font-weight:700; font-size:15px; color:var(--teal-deep); margin-bottom:10px;">¿A qué corresponde esta ubicación?</div>
+      <button id="btnModoServicio" style="width:100%; padding:12px; background:var(--teal); color:#fff; border-radius:8px; font-weight:700; margin-bottom:8px;">Un servicio sin ubicación (de hoy)</button>
+      <button id="btnModoFija" style="width:100%; padding:12px; background:var(--green); color:#fff; border-radius:8px; font-weight:700;">La ubicación fija de un baño (columna T)</button>
+    </div>
+  `;
+  document.getElementById('btnModoServicio').onclick = ()=> mostrarServiciosPendientes(link);
+  document.getElementById('btnModoFija').onclick = ()=> mostrarClientesSinUbicacionFija(link);
+}
+
+async function mostrarServiciosPendientes(link){
+  const main = document.getElementById('main');
+  main.innerHTML = '<div class="msg">Cargando servicios pendientes de ubicación...</div>';
+  try{
+    const records = await cargarJSONP(BACKEND_URL + '?action=recordsSinUbicacion&clave=' + encodeURIComponent(asegurarClaveAcceso()));
+    if(records && records.error) throw new Error(records.error);
+
+    if(!records || records.length === 0){
+      main.innerHTML = '<div class="msg">No hay servicios pendientes de ubicación ahora mismo.</div>';
+      return;
+    }
+
+    main.innerHTML = '';
+    records.forEach(rec=>{
+      const btn = document.createElement('button');
+      btn.className = 'card';
+      btn.innerHTML = `
+        <div class="cliente">${escapeHtml(rec.cliente)}</div>
+        ${rec.direccion ? `<div class="detalle">${escapeHtml(rec.direccion)}</div>` : ''}
+        <div class="fecha">${formatDateTime(rec.fechaISO)}</div>
+      `;
+      btn.onclick = async ()=>{
+        main.innerHTML = '<div class="msg">Guardando...</div>';
+        try{
+          const resp = await cargarJSONP(BACKEND_URL + '?action=setUbicacionManualGet&id=' + encodeURIComponent(rec.id) + '&link=' + encodeURIComponent(link) + '&clave=' + encodeURIComponent(asegurarClaveAcceso()));
+          if(resp && resp.error) throw new Error(resp.error);
+          main.innerHTML = `<div class="msg ok">✓ Ubicación guardada para ${escapeHtml(rec.cliente)}.<br><a href="./index.html?backend=${encodeURIComponent(BACKEND_URL)}" style="display:inline-block; margin-top:14px; padding:10px 18px; background:var(--teal); color:#fff; border-radius:8px; text-decoration:none; font-weight:700;">← Volver a la app</a></div>`;
+        }catch(err){
+          main.innerHTML = '<div class="msg err">No se pudo guardar: ' + escapeHtml(err.message) + '</div>';
+        }
+      };
+      main.appendChild(btn);
+    });
+  }catch(err){
+    main.innerHTML = '<div class="msg err">No se pudo cargar la lista: ' + escapeHtml(err.message) + '</div>';
+  }
+}
+
+async function mostrarClientesSinUbicacionFija(link){
+  const main = document.getElementById('main');
+  main.innerHTML = '<div class="msg">Cargando clientes...</div>';
+  try{
+    const clientes = await cargarJSONP(BACKEND_URL + '?action=clientesSinUbicacionFija&clave=' + encodeURIComponent(asegurarClaveAcceso()));
+    if(clientes && clientes.error) throw new Error(clientes.error);
+
+    if(!clientes || clientes.length === 0){
+      main.innerHTML = '<div class="msg">No se encontraron clientes en tu planilla.</div>';
+      return;
+    }
+
+    // Primero los que no tienen ubicación cargada todavía, al final los que ya tienen
+    // (se mantiene el orden original dentro de cada grupo).
+    clientes.sort((a, b) => (a.yaTieneUbicacion === b.yaTieneUbicacion) ? 0 : (a.yaTieneUbicacion ? 1 : -1));
+
+    main.innerHTML = `
+      <input id="buscarClienteInput" type="text" placeholder="Buscar cliente..." style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:10px; border:1px solid var(--line); border-radius:8px; font-family:var(--body); font-size:14px;">
+      <div id="listaClientesFija"></div>
+    `;
+
+    function renderLista(filtro){
+      const cont = document.getElementById('listaClientesFija');
+      cont.innerHTML = '';
+      const filtroNorm = (filtro||'').trim().toLowerCase();
+      const filtrados = filtroNorm ? clientes.filter(c => c.nombre.toLowerCase().includes(filtroNorm)) : clientes;
+
+      if(filtrados.length === 0){
+        cont.innerHTML = '<div class="msg">Ningún cliente coincide con esa búsqueda.</div>';
+        return;
+      }
+
+      filtrados.slice(0, 40).forEach(c=>{
+        const btn = document.createElement('button');
+        btn.className = 'card';
+        const badge = c.yaTieneUbicacion ? '<span style="display:inline-block; margin-left:8px; font-size:10.5px; font-weight:700; color:#8A6D3B; background:#FBF3E9; padding:2px 7px; border-radius:10px;">ya tiene — se reemplaza</span>' : '';
+        btn.innerHTML = `
+          <div class="cliente">${escapeHtml(c.nombre)}${badge}</div>
+          ${c.direccion ? `<div class="detalle">${escapeHtml(c.direccion)}</div>` : ''}
+          ${c.dia ? `<div class="fecha">${escapeHtml(c.dia)}</div>` : ''}
+        `;
+        btn.onclick = async ()=>{
+          main.innerHTML = '<div class="msg">Guardando...</div>';
+          try{
+            const resp = await cargarJSONP(BACKEND_URL + '?action=guardarUbicacionFijaGet&fila=' + encodeURIComponent(c.fila) + '&link=' + encodeURIComponent(link) + '&clave=' + encodeURIComponent(asegurarClaveAcceso()));
+            if(resp && resp.error) throw new Error(resp.error);
+            main.innerHTML = `<div class="msg ok">✓ Ubicación fija guardada para ${escapeHtml(c.nombre)} (columna T).<br><a href="./index.html?backend=${encodeURIComponent(BACKEND_URL)}" style="display:inline-block; margin-top:14px; padding:10px 18px; background:var(--teal); color:#fff; border-radius:8px; text-decoration:none; font-weight:700;">← Volver a la app</a></div>`;
+          }catch(err){
+            main.innerHTML = '<div class="msg err">No se pudo guardar: ' + escapeHtml(err.message) + '</div>';
+          }
+        };
+        cont.appendChild(btn);
+      });
+    }
+
+    renderLista('');
+    document.getElementById('buscarClienteInput').addEventListener('input', (e)=> renderLista(e.target.value));
+  }catch(err){
+    main.innerHTML = '<div class="msg err">No se pudo cargar la lista: ' + escapeHtml(err.message) + '</div>';
+  }
+}
+
+document.getElementById('volverAppLinkTop').href = './index.html?backend=' + encodeURIComponent(BACKEND_URL);
+init();
+</script>
+
+</body>
+</html>

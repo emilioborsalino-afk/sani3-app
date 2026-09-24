@@ -50,6 +50,24 @@
 <script>
 const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbxfGtx6vPMVW7yh8ZB2MREZybPBAmkgEgT6K9aumXNfn_8yDSIRY_QWhP-E_gQEVT9MfA/exec';
 
+// Misma clave que usa la app (app.js) — como esta página vive en el mismo
+// sitio, comparte el mismo localStorage: si ya la pusiste una vez en la
+// app, esta pantalla la encuentra guardada sola, sin volver a preguntar.
+// Si por algún motivo no está guardada acá (por ejemplo, entraste
+// directo a este link sin haber abierto la app antes en este celular),
+// la pide una sola vez con un cartel simple.
+const CLAVE_ACCESO_KEY = 'sani3_clave_acceso';
+let claveAcceso = localStorage.getItem(CLAVE_ACCESO_KEY) || '';
+function asegurarClaveAcceso(){
+  if(claveAcceso) return claveAcceso;
+  const ingresada = prompt('Clave de acceso de Sani3:');
+  if(ingresada){
+    claveAcceso = ingresada.trim();
+    localStorage.setItem(CLAVE_ACCESO_KEY, claveAcceso);
+  }
+  return claveAcceso;
+}
+
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
@@ -133,7 +151,7 @@ async function mostrarServiciosPendientes(link){
   const main = document.getElementById('main');
   main.innerHTML = '<div class="msg">Cargando servicios pendientes de ubicación...</div>';
   try{
-    const records = await cargarJSONP(BACKEND_URL + '?action=recordsSinUbicacion');
+    const records = await cargarJSONP(BACKEND_URL + '?action=recordsSinUbicacion&clave=' + encodeURIComponent(asegurarClaveAcceso()));
     if(records && records.error) throw new Error(records.error);
 
     if(!records || records.length === 0){
@@ -153,7 +171,7 @@ async function mostrarServiciosPendientes(link){
       btn.onclick = async ()=>{
         main.innerHTML = '<div class="msg">Guardando...</div>';
         try{
-          const resp = await cargarJSONP(BACKEND_URL + '?action=setUbicacionManualGet&id=' + encodeURIComponent(rec.id) + '&link=' + encodeURIComponent(link));
+          const resp = await cargarJSONP(BACKEND_URL + '?action=setUbicacionManualGet&id=' + encodeURIComponent(rec.id) + '&link=' + encodeURIComponent(link) + '&clave=' + encodeURIComponent(asegurarClaveAcceso()));
           if(resp && resp.error) throw new Error(resp.error);
           main.innerHTML = `<div class="msg ok">✓ Ubicación guardada para ${escapeHtml(rec.cliente)}.<br><a href="./index.html?backend=${encodeURIComponent(BACKEND_URL)}" style="display:inline-block; margin-top:14px; padding:10px 18px; background:var(--teal); color:#fff; border-radius:8px; text-decoration:none; font-weight:700;">← Volver a la app</a></div>`;
         }catch(err){
@@ -171,7 +189,7 @@ async function mostrarClientesSinUbicacionFija(link){
   const main = document.getElementById('main');
   main.innerHTML = '<div class="msg">Cargando clientes...</div>';
   try{
-    const clientes = await cargarJSONP(BACKEND_URL + '?action=clientesSinUbicacionFija');
+    const clientes = await cargarJSONP(BACKEND_URL + '?action=clientesSinUbicacionFija&clave=' + encodeURIComponent(asegurarClaveAcceso()));
     if(clientes && clientes.error) throw new Error(clientes.error);
 
     if(!clientes || clientes.length === 0){
@@ -211,7 +229,7 @@ async function mostrarClientesSinUbicacionFija(link){
         btn.onclick = async ()=>{
           main.innerHTML = '<div class="msg">Guardando...</div>';
           try{
-            const resp = await cargarJSONP(BACKEND_URL + '?action=guardarUbicacionFijaGet&fila=' + encodeURIComponent(c.fila) + '&link=' + encodeURIComponent(link));
+            const resp = await cargarJSONP(BACKEND_URL + '?action=guardarUbicacionFijaGet&fila=' + encodeURIComponent(c.fila) + '&link=' + encodeURIComponent(link) + '&clave=' + encodeURIComponent(asegurarClaveAcceso()));
             if(resp && resp.error) throw new Error(resp.error);
             main.innerHTML = `<div class="msg ok">✓ Ubicación fija guardada para ${escapeHtml(c.nombre)} (columna T).<br><a href="./index.html?backend=${encodeURIComponent(BACKEND_URL)}" style="display:inline-block; margin-top:14px; padding:10px 18px; background:var(--teal); color:#fff; border-radius:8px; text-decoration:none; font-weight:700;">← Volver a la app</a></div>`;
           }catch(err){

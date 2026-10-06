@@ -34,7 +34,10 @@ if(document.getElementById('identidadOverlay')){
     };
   });
 }
-let reconexionTimer = null; // si falla la conexión, guarda el temporizador que sigue reintentando solo, en el fondo
+let reconexionTimer = null; // si falla la conexión, guarda el temporizador que sigue reintentando solo, en el fondo (solo en la app del dueño; en la de empleados no se reintenta solo)
+let yaConectoBien = false;  // true después de la primera carga exitosa de esta sesión
+let fallosSeguidos = 0;     // cuántas cargas fallaron seguidas, sin ningún éxito en el medio
+let ultimoRecargoPorErrorScript = 0; // para no recargar por "Script error." más de una vez cada 30 segundos
 let clients = [];
 let records = [];
 let pendientesSemana = []; // lista de "Pendientes de esta semana" (viene de la planilla, se muestra como grupo extra)
@@ -91,6 +94,20 @@ function cargarCacheLocal(){
       empresasConDeuda = JSON.parse(deudaGuardada).empresasConDeuda || [];
     }
     const fecha = new Date(parsedClientes.guardadoEn);
+    return fecha.toLocaleDateString('es-AR') + ' ' + fecha.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+  }catch(err){
+    return null;
+  }
+}
+
+// Igual que cargarCacheLocal, pero SOLO devuelve la fecha/hora de la última
+// copia guardada — sin volver a cargar esos datos encima de lo que ya hay
+// en pantalla (se usa en los avisos de "sin conexión").
+function leerFechaCacheLocal(){
+  try{
+    const guardado = localStorage.getItem(CLIENTS_CACHE_KEY);
+    if(!guardado) return null;
+    const fecha = new Date(JSON.parse(guardado).guardadoEn);
     return fecha.toLocaleDateString('es-AR') + ' ' + fecha.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
   }catch(err){
     return null;
@@ -159,12 +176,16 @@ function fusionarPendientesEnRecords(){
 // se llama sola cada vez que hay conexión (al conectar, actualizar, o apenas
 // el celular recupera señal).
 let subiendoPendientes = false;
-async function reintentarPendientes(){
-  if(subiendoPendientes) return; // evita que se pisen dos intentos al mismo tiempo
+// "silencioso" = true es el intento tranquilo que se hace solo cada tanto:
+// no toca ningún cartel ni redibuja nada, salvo que de verdad logre subir
+// alguna foto. Devuelve cuántas fotos se subieron.
+async function reintentarPendientes(silencioso){
+  const callado = (silencioso === true);
+  if(subiendoPendientes) return 0; // evita que se pisen dos intentos al mismo tiempo
   const lista = obtenerPendientes();
-  if(lista.length === 0) return;
+  if(lista.length === 0) return 0;
   subiendoPendientes = true;
-  setStatus('Subiendo ' + lista.length + (lista.length === 1 ? ' foto pendiente...' : ' fotos pendientes...'));
+  if(!callado) setStatus('Subiendo ' + lista.length + (lista.length === 1 ? ' foto pendiente...' : ' fotos pendientes...'));
   let subidas = 0;
   for(const payload of lista){
     try{
@@ -181,14 +202,28 @@ async function reintentarPendientes(){
     }
   }
   subiendoPendientes = false;
-  renderHistory();
-  renderPendientesBadge();
+  if(!callado || subidas > 0){
+    renderHistory();
+    renderPendientesBadge();
+  }
   if(subidas > 0){
     const restantes = obtenerPendientes().length;
     setStatus(restantes === 0 ? 'Todo sincronizado ✓' : ('Se subieron ' + subidas + ', quedan ' + restantes + ' pendientes.'), 'ok');
   }
+  return subidas;
 }
-window.addEventListener('online', reintentarPendientes);
+window.addEventListener('online', ()=>{ reintentarPendientes(); });
+
+// Mientras haya fotos pendientes de subir, un intento tranquilo cada 1
+// minuto — en las dos apps. Si no hay ninguna pendiente (lo normal), esto
+// solo mira el celular y no pide nada a internet. Tampoco intenta si falta
+// la URL del backend o la clave (para no hacer saltar el cartel de la
+// clave en cualquier momento).
+setInterval(()=>{
+  if(!backendUrl || !claveAcceso) return;
+  if(obtenerPendientes().length === 0) return;
+  reintentarPendientes(true);
+}, 60000);
 
 function todayLabel(){
   const d = new Date();
@@ -228,10 +263,17 @@ window.addEventListener('error', (e)=>{
     // Este es el mensaje genérico que da el navegador cuando algo falla en
     // la conexión con Google (que es de otro sitio web) — nunca trae
     // ningún detalle real, así que mostrarlo tal cual solo asusta sin
-    // ayudar. En vez de eso, probamos reconectar solos; "loadAll" ya sabe
-    // manejar sus propios errores de conexión con un aviso más claro, así
-    // que si vuelve a fallar, el aviso que se va a ver es ese, no este.
-    setTimeout(()=>{ loadAll(); }, 1500);
+    // ayudar. En la app de empleados no hacemos nada con esto (si algo
+    // falla, queda con la copia guardada y se actualiza tocando
+    // "Actualizar"). En la del dueño probamos reconectar, pero como mucho
+    // una vez cada 30 segundos y "en segundo plano": si ya estaba
+    // conectado, no cambia el cartel ni redibuja nada hasta que falle de
+    // verdad.
+    if(window.MODO_EMPLEADO) return;
+    const ahoraMs = Date.now();
+    if(ahoraMs - ultimoRecargoPorErrorScript < 30000) return;
+    ultimoRecargoPorErrorScript = ahoraMs;
+    setTimeout(()=>{ loadAll(true); }, 1500);
     return;
   }
   showFatalError(e.message);
@@ -352,18 +394,22 @@ async function backendPost(payload){
   return data;
 }
 
-let cargandoEnCurso = false; // evita que dos "loadAll" se pisen entre sí (por ejemplo el reintento de cada 8s y el de "Script error." disparándose casi juntos)
-async function loadAll(){
+let cargandoEnCurso = false; // evita que dos "loadAll" se pisen entre sí
+// "segundoPlano" = true cuando la carga la dispara la propia app sola (un
+// reintento automático) y no una persona tocando algo. En ese caso no se
+// muestra "Conectando...", no se vuelve a dibujar la copia guardada, y si
+// la app ya estaba conectada no cambia el cartel hasta que falle de verdad.
+async function loadAll(segundoPlano){
   if(cargandoEnCurso) return; // ya hay una carga en curso, no arrancamos otra encima
   cargandoEnCurso = true;
   try{
-    await loadAllInterno();
+    await loadAllInterno(segundoPlano === true);
   } finally {
     cargandoEnCurso = false;
   }
 }
 
-async function loadAllInterno(){
+async function loadAllInterno(segundoPlano){
   // Guardamos dónde estabas parado con el scroll justo antes de redibujar
   // (no antes de esperar la conexión) — así conectar o reconectar en el
   // fondo no te mueve la pantalla de lugar, incluso si te movés vos
@@ -376,25 +422,34 @@ async function loadAllInterno(){
 
   // Primero mostramos YA MISMO lo que haya guardado en el celular (si hay),
   // para que puedas empezar a trabajar al toque, sin esperar a ver si Google
-  // responde rápido o lento hoy.
-  const fechaCache = cargarCacheLocal();
-  fusionarPendientesEnRecords();
-  const scrollAntes1 = window.scrollY;
-  renderClientSelect();
-  renderClientList();
-  renderHistory();
-  renderPendientesBadge();
-  restaurarScrollA(scrollAntes1);
+  // responde rápido o lento hoy. En un reintento automático esto no se
+  // hace: los datos ya están en pantalla, volver a dibujarlos no sirve de
+  // nada y es lo que hacía lenta la app.
+  let fechaCache = null;
+  if(!segundoPlano){
+    fechaCache = cargarCacheLocal();
+    fusionarPendientesEnRecords();
+    const scrollAntes1 = window.scrollY;
+    renderClientSelect();
+    renderClientList();
+    renderHistory();
+    renderPendientesBadge();
+    restaurarScrollA(scrollAntes1);
+  }
 
   if(!backendUrl){
     setConnDot(false);
     return;
   }
 
-  setConnDot(false);
-  setConnStatus(fechaCache
-    ? ('Conectando... mientras tanto podés seguir trabajando con la copia guardada de las ' + fechaCache + '.')
-    : 'Conectando...');
+  if(!segundoPlano){
+    setConnDot(false);
+    setConnStatus(fechaCache
+      ? ('Conectando... mientras tanto podés seguir trabajando con la copia guardada de las ' + fechaCache + '.')
+      : 'Conectando...');
+  }
+
+  let hayQueRedibujar = false;
 
   // Recién ahora, en segundo plano, intentamos la conexión de verdad — sin
   // que esto bloquee ni retrase lo que ya se mostró arriba.
@@ -432,23 +487,27 @@ async function loadAllInterno(){
     guardarCacheLocal();
     fusionarPendientesEnRecords();
 
+    yaConectoBien = true;
+    fallosSeguidos = 0;
+    hayQueRedibujar = true;
     setConnDot(true);
     setConnStatus('Conectado. ' + clients.length + ' clientes, ' + records.length + ' servicios en el historial.', 'ok');
 
     reintentarPendientes();
     if(reconexionTimer){ clearTimeout(reconexionTimer); reconexionTimer = null; } // ya conectó, no hace falta seguir insistiendo
   }catch(err){
-    setConnDot(false);
     // Si el error es justo por una clave de acceso mala (por ejemplo, si
     // el dueño la cambió, o alguien la escribió mal), la tratamos DISTINTO
     // a un problema de conexión real: no mostramos la copia guardada del
     // celular (daría la falsa impresión de estar "adentro" sin la clave
-    // correcta) y tampoco reintentamos solos cada 8 segundos (eso hacía
-    // que el cartel pidiendo la clave apareciera una y otra vez solo,
-    // aunque nadie lo hubiera tocado). Se vacía la pantalla y queda
-    // esperando a que alguien mismo toque "Actualizar" o "Conectar" con
-    // la clave correcta.
+    // correcta) y tampoco reintentamos solos (eso hacía que el cartel
+    // pidiendo la clave apareciera una y otra vez, aunque nadie lo
+    // hubiera tocado). Se vacía la pantalla y queda esperando a que
+    // alguien mismo toque "Actualizar" o "Conectar" con la clave correcta.
     if(String(err.message || '').indexOf('Clave de acceso') !== -1){
+      yaConectoBien = false;
+      fallosSeguidos = 0;
+      setConnDot(false);
       claveAcceso = '';
       try{ localStorage.removeItem(CLAVE_ACCESO_KEY); }catch(errLs){ /* nada */ }
       clients = [];
@@ -456,29 +515,59 @@ async function loadAllInterno(){
       pendientesSemana = [];
       obradores = [];
       empresasConDeuda = [];
+      hayQueRedibujar = true;
       setConnStatus('Clave de acceso incorrecta — pedísela al dueño y tocá "Actualizar" para volver a intentar.', 'err');
       if(reconexionTimer){ clearTimeout(reconexionTimer); reconexionTimer = null; }
     } else {
-      const fechaCacheFalla = cargarCacheLocal();
-      fusionarPendientesEnRecords();
-      if(fechaCacheFalla){
-        setConnStatus('Sin conexión — trabajando con la copia guardada de las ' + fechaCacheFalla + '. Podés seguir sacando fotos, se suben solas cuando vuelva la conexión. Reintentando conectar solo en el fondo...', 'err');
-      } else {
-        setConnStatus('Error al conectar: ' + err.message + ' — reintentando solo en el fondo...', 'err');
+      fallosSeguidos++;
+      // En la app del dueño: si ya estaba conectada y esta es la PRIMERA
+      // falla de una recarga automática, todavía no avisamos nada (puede
+      // ser un bache de un instante) — recién a la segunda falla seguida
+      // pasa a "Sin conexión". En la de empleados no se espera: si falla,
+      // se avisa enseguida, porque ahí no hay reintentos automáticos.
+      const callarPorAhora = segundoPlano && yaConectoBien && fallosSeguidos < 2 && !window.MODO_EMPLEADO;
+      if(!callarPorAhora){
+        yaConectoBien = false;
+        setConnDot(false);
+        const fechaCacheFalla = leerFechaCacheLocal();
+        if(window.MODO_EMPLEADO){
+          if(fechaCacheFalla){
+            setConnStatus('Sin conexión — trabajando con la copia guardada de las ' + fechaCacheFalla + '. Podés seguir sacando fotos: se suben solas cuando vuelva la señal. Tocá "Actualizar" para volver a probar.', 'err');
+          } else {
+            setConnStatus('Error al conectar: ' + err.message + ' — tocá "Actualizar" para volver a probar.', 'err');
+          }
+        } else if(fechaCacheFalla){
+          setConnStatus('Sin conexión — trabajando con la copia guardada de las ' + fechaCacheFalla + '. Podés seguir sacando fotos, se suben solas cuando vuelva la conexión. Reintentando conectar solo en el fondo...', 'err');
+        } else {
+          setConnStatus('Error al conectar: ' + err.message + ' — reintentando solo en el fondo...', 'err');
+        }
       }
-      // Como esto es solo LEER datos (nunca cambia nada), es seguro reintentar
-      // todas las veces que haga falta sin arriesgar duplicar nada — a
-      // diferencia de guardar (fotos, pagos), que nunca se reintenta solo.
-      if(reconexionTimer) clearTimeout(reconexionTimer);
-      reconexionTimer = setTimeout(loadAll, 8000);
+      // Reintento automático SOLO en la app del dueño: cada 10 segundos,
+      // hasta que conecte (cuando conecta, se corta solo — ver arriba).
+      // Como esto es solo LEER datos (nunca cambia nada), es seguro
+      // reintentar sin arriesgar duplicar nada — a diferencia de guardar
+      // (fotos, pagos), que nunca se reintenta solo. En la app de
+      // empleados no se reintenta: queda con la copia guardada hasta que
+      // toquen "Actualizar" (las fotos pendientes se suben aparte, con su
+      // propio intento tranquilo cada minuto).
+      if(!window.MODO_EMPLEADO){
+        if(reconexionTimer) clearTimeout(reconexionTimer);
+        reconexionTimer = setTimeout(()=>{ loadAll(true); }, 10000);
+      }
     }
   }
-  const scrollAntes2 = window.scrollY;
-  renderClientSelect();
-  renderClientList();
-  renderHistory();
-  renderPendientesBadge();
-  restaurarScrollA(scrollAntes2);
+
+  // Solo se vuelve a dibujar todo si algo cambió de verdad (llegaron datos
+  // nuevos, o se vació la pantalla por la clave). Si la conexión falló, lo
+  // que estaba en pantalla se deja tal cual, sin dibujarlo de nuevo.
+  if(hayQueRedibujar){
+    const scrollAntes2 = window.scrollY;
+    renderClientSelect();
+    renderClientList();
+    renderHistory();
+    renderPendientesBadge();
+    restaurarScrollA(scrollAntes2);
+  }
 }
 
 document.getElementById('companyName').addEventListener('change', async (e)=>{

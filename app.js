@@ -1128,7 +1128,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
       btnPago.textContent = 'Guardando...';
       btnPago.disabled = true;
       try{
-        const resultado = await backendPost({ action:'sumarUnMesPago', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', usuario: usuarioActual });
+        const resultado = await backendPost({ action:'sumarUnMesPago', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', fechaInicio: c.fechaInicio || '', usuario: usuarioActual });
         if(resultado && resultado.error){
           setStatus('No se pudo actualizar el pago de ' + c.nombre + ': ' + resultado.error, 'err');
           alert('❌ No se pudo actualizar el pago de ' + c.nombre + ':\n\n' + resultado.error);
@@ -1159,7 +1159,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
       btnMonto.textContent = 'Guardando...';
       btnMonto.disabled = true;
       try{
-        const resultado = await backendPost({ action:'actualizarMontoPago', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', monto: nuevoTexto, usuario: usuarioActual });
+        const resultado = await backendPost({ action:'actualizarMontoPago', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', fechaInicio: c.fechaInicio || '', monto: nuevoTexto, usuario: usuarioActual });
         if(resultado && resultado.error){
           setStatus('No se pudo actualizar el monto de ' + c.nombre + ': ' + resultado.error, 'err');
           alert('❌ No se pudo actualizar el monto de ' + c.nombre + ':\n\n' + resultado.error);
@@ -1189,7 +1189,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
       btnCortar.textContent = 'Moviendo...';
       btnCortar.disabled = true;
       try{
-        const resultado = await backendPost({ action:'cortarClienteAlFinal', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', usuario: usuarioActual });
+        const resultado = await backendPost({ action:'cortarClienteAlFinal', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', fechaInicio: c.fechaInicio || '', usuario: usuarioActual });
         if(resultado && resultado.error){
           setStatus('No se pudo cortar a ' + c.nombre + ': ' + resultado.error, 'err');
           alert('❌ No se pudo cortar a ' + c.nombre + ':\n\n' + resultado.error);
@@ -1222,7 +1222,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
       btnADeuda.textContent = 'Moviendo...';
       btnADeuda.disabled = true;
       try{
-        const resultado = await backendPost({ action:'cortarClienteADeuda', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', usuario: usuarioActual });
+        const resultado = await backendPost({ action:'cortarClienteADeuda', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', fechaInicio: c.fechaInicio || '', usuario: usuarioActual });
         if(resultado && resultado.error){
           setStatus('No se pudo mover a ' + c.nombre + ': ' + resultado.error, 'err');
           alert('❌ No se pudo mover a ' + c.nombre + ':\n\n' + resultado.error);
@@ -1262,7 +1262,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
       btnNota.textContent = 'Guardando...';
       btnNota.disabled = true;
       try{
-        await backendPost({ action:'actualizarObservacionCliente', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', texto: nuevoTexto, usuario: usuarioActual });
+        await backendPost({ action:'actualizarObservacionCliente', hoja:'Registro Alquileres', nombre: c.nombre, direccion: c.direccion || '', fechaInicio: c.fechaInicio || '', texto: nuevoTexto, usuario: usuarioActual });
         c.observacion = nuevoTexto.trim();
         // Recalculamos localmente los indicadores que dependen del texto, para
         // que se vea bien al toque sin tener que esperar el próximo refresco.
@@ -1308,7 +1308,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
       btnAplicarColor.textContent = 'Aplicando...';
       btnAplicarColor.disabled = true;
       try{
-        await backendPost({ action:'marcarColorReserva', nombre: c.nombre, direccion: c.direccion || '', color });
+        await backendPost({ action:'marcarColorReserva', nombre: c.nombre, direccion: c.direccion || '', fechaInicio: c.fechaInicio || '', color });
         c.colorReserva = color;
         setStatus('Marcado (' + color + '): ' + c.nombre, 'ok');
         renderClientList();
@@ -1330,7 +1330,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
       const ok = confirm('¿Seguro que querés quitar a "' + c.nombre + '"? Se borra también de la planilla, no se puede deshacer.');
       if(!ok) return;
       try{
-        await backendPost({ action:'deleteClient', nombre: c.nombre, direccion: c.direccion || '' });
+        await backendPost({ action:'deleteClient', nombre: c.nombre, direccion: c.direccion || '', fechaInicio: c.fechaInicio || '' });
         const idx = clients.indexOf(c);
         if(idx !== -1) clients.splice(idx,1);
         renderClientSelect();
@@ -1379,7 +1379,7 @@ function crearFilaCliente(c, i, grupo, mostrarPago){
       btnAplicar.textContent = 'Aplicando...';
       btnAplicar.disabled = true;
       try{
-        await backendPost({ action:'marcarClienteParaRetirar', nombre: c.nombre, direccion: c.direccion || '', color, fechaTexto });
+        await backendPost({ action:'marcarClienteParaRetirar', nombre: c.nombre, direccion: c.direccion || '', fechaInicio: c.fechaInicio || '', color, fechaTexto });
         c.marcaRetiro = (color === 'blanco') ? '' : color;
         c.suspendido = (color === 'celeste');
         setStatus(color === 'blanco' ? ('Se sacó la marca de ' + c.nombre) : ('Marcado (' + color + '): ' + c.nombre), 'ok');

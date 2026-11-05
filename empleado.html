@@ -12,9 +12,12 @@
 <meta name="apple-mobile-web-app-title" content="Sani3 Empleado">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="icon-192.png">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Sin señal ni crédito, esta pantalla tiene que abrir igual: las tipografías se piden
+     "de costado" (no frenan la carga; si no llegan, se usa la letra del celular) y la
+     librería de Excel solo se pide cuando alguien toca "Exportar" (ver el final del archivo). -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap"></noscript>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
   :root{
     --bg: #F3F6F5;
@@ -333,6 +336,45 @@
 
 <script>window.MODO_EMPLEADO = true;</script>
 <script src="app.js?v=97"></script>
+<script>
+// Exportar historial a Excel: la librería se descarga recién cuando se toca el botón
+// (y necesita señal en ese momento). Antes se pedía al abrir la página y, sin datos,
+// dejaba la app colgada esperando.
+(function(){
+  const btn = document.getElementById('exportBtn');
+  if(!btn || typeof btn.onclick !== 'function') return;
+  const exportarOriginal = btn.onclick;
+  btn.onclick = function(ev){
+    if(window.XLSX) return exportarOriginal.call(btn, ev);
+    const textoAntes = btn.textContent;
+    btn.textContent = 'Cargando exportador...';
+    const sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    sc.onload = function(){ btn.textContent = textoAntes; exportarOriginal.call(btn, ev); };
+    sc.onerror = function(){ btn.textContent = textoAntes; alert('Para exportar necesitás conexión a internet. Probá de nuevo cuando tengas señal.'); };
+    document.head.appendChild(sc);
+  };
+})();
+
+// Cada vez que el empleado VUELVE a la app (la había dejado en segundo plano un rato),
+// se actualizan los clientes desde la planilla — así ve enseguida lo que Emilio
+// cargó, cambió o eliminó en el día. Si no hay señal, queda la última copia guardada.
+// No actualiza si estuvo afuera menos de 2 minutos (por ejemplo, yendo a la cámara a sacar
+// una foto) ni mientras se está guardando una foto.
+(function(){
+  const MIN_AFUERA_MS = 2 * 60 * 1000;
+  let ocultaDesde = null;
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'hidden'){ ocultaDesde = Date.now(); return; }
+    if(ocultaDesde === null) return;
+    const afuera = Date.now() - ocultaDesde;
+    ocultaDesde = null;
+    if(afuera < MIN_AFUERA_MS) return;
+    try{ if(typeof guardadoEnProgreso !== 'undefined' && guardadoEnProgreso) return; }catch(e){}
+    if(typeof loadAll === 'function') loadAll(true);
+  });
+})();
+</script>
 
 </body>
 </html>

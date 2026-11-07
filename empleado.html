@@ -334,8 +334,12 @@
   <img id="lightboxImg" src="">
 </div>
 
-<script>window.MODO_EMPLEADO = true;</script>
-<script src="app.js?v=97"></script>
+<script>window.MODO_EMPLEADO = true; document.body.classList.add('modo-empleado');</script>
+<script>
+// Si el celular perdió la URL guardada, la dejamos cargada de nuevo antes de que arranque la app.
+try{ if(!localStorage.getItem('sani3_backend_url')) localStorage.setItem('sani3_backend_url','https://script.google.com/macros/s/AKfycbxfGtx6vPMVW7yh8ZB2MREZybPBAmkgEgT6K9aumXNfn_8yDSIRY_QWhP-E_gQEVT9MfA/exec'); }catch(e){}
+</script>
+<script src="app.js?v=97" onerror="var e=document.getElementById('connStatus'); if(e){e.textContent='No se pudo cargar la app. Abrila con señal (datos o WiFi) y esperá unos segundos.'; e.style.color='#B3412A';}"></script>
 <script>
 // Exportar historial a Excel: la librería se descarga recién cuando se toca el botón
 // (y necesita señal en ese momento). Antes se pedía al abrir la página y, sin datos,

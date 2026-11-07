@@ -339,7 +339,30 @@
 // Si el celular perdió la URL guardada, la dejamos cargada de nuevo antes de que arranque la app.
 try{ if(!localStorage.getItem('sani3_backend_url')) localStorage.setItem('sani3_backend_url','https://script.google.com/macros/s/AKfycbxfGtx6vPMVW7yh8ZB2MREZybPBAmkgEgT6K9aumXNfn_8yDSIRY_QWhP-E_gQEVT9MfA/exec'); }catch(e){}
 </script>
-<script src="app.js?v=97" onerror="var e=document.getElementById('connStatus'); if(e){e.textContent='No se pudo cargar la app. Abrila con señal (datos o WiFi) y esperá unos segundos.'; e.style.color='#B3412A';}"></script>
+<script>
+// Si app.js no se pudo bajar (señal floja o sin señal), avisa y reintenta solo cada 4 segundos.
+(function(){
+  var intentos = 0;
+  window.__appJsFalla = function(){
+    intentos++;
+    var e = document.getElementById('connStatus');
+    if(e){
+      e.textContent = (intentos < 20)
+        ? 'La app todavía no pudo cargar (necesita señal de datos o WiFi). Reintentando... (' + intentos + ')'
+        : 'No se pudo cargar la app. Abrila de nuevo con señal (datos o WiFi).';
+      e.style.color = '#B3412A';
+    }
+    if(intentos >= 20) return;
+    setTimeout(function(){
+      var sc = document.createElement('script');
+      sc.src = 'app.js?v=97';
+      sc.onerror = window.__appJsFalla;
+      document.body.appendChild(sc);
+    }, 4000);
+  };
+})();
+</script>
+<script src="app.js?v=97" onerror="window.__appJsFalla()"></script>
 <script>
 // Exportar historial a Excel: la librería se descarga recién cuando se toca el botón
 // (y necesita señal en ese momento). Antes se pedía al abrir la página y, sin datos,

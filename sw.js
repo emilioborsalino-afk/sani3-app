@@ -20,6 +20,7 @@ const CACHE_NAME = 'sani3-cache-v1';
 const ARCHIVOS_APP_SHELL = [
   './empleado.html',
   './index.html',
+  './app.js?v=97',
   './manifest.json',
   './manifest-empleado.json',
   './icon-192.png',
